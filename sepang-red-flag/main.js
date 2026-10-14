@@ -7,7 +7,12 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
-const W = 1920, H = 1080;
+// ?portrait=1 renders 1080x1920 for vertical edits: wider FOV, subject lower in frame, and only the
+// overlay pieces that have a portrait layout (power-unit text column, telemetry, 3D callouts).
+const PORTRAIT = new URLSearchParams(location.search).has('portrait');
+// ?hud=1 draws only the data graphics (telemetry) on black, for screen-blending over real footage
+const HUD = new URLSearchParams(location.search).has('hud');
+const W = PORTRAIT ? 1080 : 1920, H = PORTRAIT ? 1920 : 1080;
 const V3 = THREE.Vector3, UP = new V3(0, 1, 0);
 
 // ---------------------------------------------------------------- utils
@@ -49,6 +54,7 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x0a0e16, 0.001);
 scene.background = new THREE.Color(0x0a0e16);
 const camera = new THREE.PerspectiveCamera(40, W / H, 0.03, 40000);
+if (PORTRAIT) camera.setViewOffset(W, H, 0, -300, W, H);
 const rt = new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType, samples: 4 });
 const composer = new EffectComposer(renderer, rt);
 composer.addPass(new RenderPass(scene, camera));
@@ -69,8 +75,12 @@ function spriteTex() {
 }
 const SPRITE = spriteTex();
 
-// ---------------------------------------------------------------- track (stylised Sepang, mirrored so T1 is a right-hander)
-const RAW = [[-0.95, .35], [0, .35], [.95, .35], [1.22, .3], [1.25, .08], [1.05, 0], [.3, 0], [-.6, 0], [-1.05, 0], [-1.3, -.08], [-1.32, -.28], [-1.15, -.4], [-1.25, -.6], [-1.1, -.88], [-.7, -.98], [-.3, -.9], [0, -1], [.25, -.85], [.5, -.95], [.8, -.8], [1.05, -.95], [1.45, -.9], [1.65, -.6], [1.6, -.35], [1.7, .1], [1.75, .45], [1.6, .75], [1.25, .8], [1, .95], [.95, .75], [.6, .7], [.2, .85], [-.2, .7], [-.55, .8], [-.95, .75], [-1.15, .6], [-1.1, .42]];
+// ---------------------------------------------------------------- track (real Sepang International Circuit)
+// Centreline from github.com/bacinger/f1-circuits (my-1999.geojson, MIT). Converted to km east/north of the
+// start line, then laid out so the main straight runs +x into T1 (same convention the scenes were built on).
+const SEPANG = [[101.735641,2.760529],[101.732942,2.760307],[101.732818,2.760317],[101.732706,2.760373],[101.732629,2.760454],[101.732587,2.760564],[101.732582,2.760688],[101.732627,2.760818],[101.732732,2.760916],[101.732874,2.760961],[101.733040,2.760928],[101.733348,2.760818],[101.733451,2.760835],[101.733538,2.760921],[101.733566,2.761026],[101.733538,2.761164],[101.733446,2.761304],[101.733236,2.761561],[101.733147,2.761718],[101.733089,2.761904],[101.733061,2.762091],[101.733061,2.762303],[101.733112,2.762825],[101.733194,2.763070],[101.733323,2.763320],[101.733453,2.763481],[101.733653,2.763662],[101.733863,2.763800],[101.734083,2.763881],[101.735319,2.764284],[101.736244,2.764648],[101.736863,2.764916],[101.737262,2.765097],[101.737400,2.765153],[101.737503,2.765149],[101.737592,2.765093],[101.737624,2.764981],[101.737796,2.764022],[101.737901,2.763528],[101.738049,2.762929],[101.738157,2.762698],[101.738278,2.762533],[101.738486,2.762367],[101.738692,2.762257],[101.738897,2.762206],[101.739098,2.762197],[101.739327,2.762232],[101.739561,2.762323],[101.739727,2.762442],[101.740051,2.762789],[101.740210,2.762885],[101.740460,2.762971],[101.740673,2.762978],[101.740883,2.762950],[101.741053,2.762880],[101.741205,2.762759],[101.743020,2.760691],[101.743030,2.760590],[101.742988,2.760475],[101.742679,2.759782],[101.742586,2.759717],[101.742476,2.759691],[101.740819,2.759595],[101.739263,2.759413],[101.738410,2.759273],[101.738329,2.759207],[101.738303,2.759098],[101.738375,2.758976],[101.738983,2.758640],[101.739116,2.758506],[101.739209,2.758308],[101.739256,2.758102],[101.739249,2.757808],[101.739209,2.757561],[101.739154,2.757320],[101.739009,2.757012],[101.738792,2.756697],[101.738673,2.756622],[101.738559,2.756603],[101.738430,2.756627],[101.738327,2.756694],[101.736426,2.758259],[101.736293,2.758308],[101.736122,2.758318],[101.735935,2.758271],[101.735242,2.757916],[101.735057,2.757858],[101.734837,2.757828],[101.734644,2.757830],[101.734284,2.757895],[101.734039,2.757996],[101.733880,2.758122],[101.733667,2.758402],[101.733592,2.758612],[101.733581,2.758740],[101.733670,2.758884],[101.733861,2.758963],[101.741400,2.760348],[101.741508,2.760443],[101.741587,2.760625],[101.741547,2.760777],[101.741410,2.760919],[101.741185,2.760954]];
+const KX = 111.320 * Math.cos(2.7605 * Math.PI / 180), KY = 110.574;
+const RAW = SEPANG.map(([lo, la]) => [(lo - SEPANG[0][0]) * KX, -(la - SEPANG[0][1]) * KY]);
 let tp = RAW.map(([x, y]) => new V3(-x, 0, -y));
 const scale = 5543 / new THREE.CatmullRomCurve3(tp, true, 'centripetal').getLength();
 tp = tp.map(p => p.multiplyScalar(scale));
@@ -85,6 +95,10 @@ function frameAt(s) {
   const x = ((s / L) % 1 + 1) % 1 * NS, i = Math.floor(x), k = x - i, j = i + 1;
   return { p: P[i].clone().lerp(P[j], k), f: TN[i].clone().lerp(TN[j], k).normalize(), r: RT[i].clone().lerp(RT[j], k).normalize() };
 }
+const BB = (() => { let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; P.forEach(p => { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z); });
+  const w = x1 - x0, d = z1 - z0, tf = Math.tan(19 * Math.PI / 180), asp = W / H; // top-down map height that fits the circuit
+  const h = PORTRAIT ? w / .8 / (2 * Math.tan(19 * 1.15 * Math.PI / 180)) : Math.max(d / .62, w / .5 / asp) / (2 * tf);
+  return { cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, w, d, h }; })();
 function sNear(x, z) { let b = 0, bd = 1e18; for (let i = 0; i < NS; i++) { const d = (P[i].x - x) ** 2 + (P[i].z - z) ** 2; if (d < bd) { bd = d; b = i; } } return b / NS * L; }
 const curv = i => { const a = TN[(i - 6 + NS) % NS], b = TN[(i + 6) % NS]; return Math.acos(clamp(a.dot(b), -1, 1)); };
 
@@ -115,17 +129,24 @@ for (const s of [-1, 1]) {
 const rlineMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(.25, 1.6, 2.6), toneMapped: false, transparent: true, side: THREE.DoubleSide, fog: false });
 const rline = ribbon(-4, 4, .6, null, rlineMat); world.add(rline);
 const glowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(4, .3, .2), toneMapped: false, side: THREE.DoubleSide, fog: false });
-// stands between the two straights + pit building
+// main grandstand between the two straights, pit building across the main straight
 const standMat = new THREE.MeshStandardMaterial({ color: 0x2a3038, roughness: .7, metalness: .2 });
 const lampMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.0, 1.7), toneMapped: false });
+const sStand = sNear(-.15 * scale, 0);
+let STAND_POS;
 {
-  const st = new THREE.Mesh(new THREE.BoxGeometry(1.7 * scale, 18, 30), standMat); st.position.set(0, 9, -.175 * scale); trackG.add(st);
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.7 * scale, 1, 40), standMat); roof.position.set(0, 26, -.175 * scale); trackG.add(roof);
-  for (const z of [-.175 * scale + 19, -.175 * scale - 19]) { const l = new THREE.Mesh(new THREE.BoxGeometry(1.7 * scale, .5, .5), lampMat); l.position.set(0, 25.5, z); trackG.add(l); }
-  const pit = new THREE.Mesh(new THREE.BoxGeometry(1.2 * scale, 11, 22), standMat); pit.position.set(-.1 * scale, 5.5, 40); trackG.add(pit);
-  const pl = new THREE.Mesh(new THREE.BoxGeometry(1.2 * scale, .4, .4), lampMat); pl.position.set(-.1 * scale, 9, 28.8); trackG.add(pl);
-  // pit wall
-  const pw = new THREE.Mesh(new THREE.BoxGeometry(1.4 * scale, 1.1, .6), new THREE.MeshStandardMaterial({ color: 0x8a9099, roughness: .5 })); pw.position.set(0, .55, 13); trackG.add(pw);
+  const A = frameAt(sStand); let B = null, bd = 1e18;
+  for (let i = 0; i < NS; i++) { if (TN[i].dot(A.f) > -.8) continue; const d = P[i].distanceToSquared(A.p); if (d < bd) { bd = d; B = P[i]; } }
+  const n = B.clone().sub(A.p), gap = n.length(); n.normalize();
+  const g = new THREE.Group(); g.position.copy(A.p); g.rotation.y = Math.atan2(-A.f.z, A.f.x); trackG.add(g);
+  const sd = Math.sign(n.dot(new V3(Math.sin(g.rotation.y), 0, Math.cos(g.rotation.y)))) || 1; // local +z*sd points at the back straight
+  const zs = sd * gap * .5, dep = Math.min(30, gap * .35);
+  const box = (w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); g.add(o); return o; };
+  box(450, 18, dep, standMat, -60, 9, zs); box(450, 1, dep + 10, standMat, -60, 26, zs);
+  for (const z of [zs + dep * .6, zs - dep * .6]) box(450, .5, .5, lampMat, -60, 25.5, z);
+  box(400, 11, 22, standMat, -40, 5.5, -sd * 40); box(400, .4, .4, lampMat, -40, 9, -sd * 28.8);
+  box(520, 1.1, .6, new THREE.MeshStandardMaterial({ color: 0x8a9099, roughness: .5 }), -40, .55, -sd * 13);
+  STAND_POS = A.p.clone().addScaledVector(n, gap * .5).add(new V3(0, 30, 0));
 }
 // palm-ish tree blobs around the circuit for scale
 {
@@ -189,7 +210,8 @@ function makeSC() {
 }
 const carsG = new THREE.Group(); world.add(carsG);
 // formation-lap cars (scene 3)
-const sGrid = sNear(-.72 * scale, 0);
+const sT1 = sNear(.34 * scale, -.02 * scale), sT15 = sNear(-.66 * scale, -.03 * scale);
+const sGrid = sNear(-.015 * scale, 0); // pole sits just behind the start line
 const FCARS = [
   ['VER', 0x16206a, 0xe8002d, 0, -2.6], ['HAM', 0xd10a0a, 0xf5f5f5, -9, 2.6], ['ANT', 0xbfc6cc, 0x00c8b4, -18, -2.6],
   ['RUS', 0xbfc6cc, 0x00c8b4, -27, 2.6], ['LEC', 0xd10a0a, 0xf5f5f5, -36, -2.6], ['NOR', 0xff7a00, 0x15151a, -45, 2.6],
@@ -204,7 +226,7 @@ const formation = FCARS.map(([code, b, a, s0, lat], i) => {
   return { code, obj, dist: t => sGrid + dist(t), speed, lat: latf };
 });
 // race restart cars (scene 7) on the back straight
-const sBack = sNear(.95 * scale, -.35 * scale);
+const sBack = sNear(-.2 * scale, -.11 * scale); // middle of the back straight
 const sc = makeSC(); carsG.add(sc);
 const RCARS = [['SC', 70, 0], ['VER', 52, 0], ['HAM', 40, .8], ['ANT', 28, -.6], ['RUS', 16, .5], ['LEC', 4, -.4], ['NOR', -8, .6], ['PIA', -20, -.5]];
 const race = RCARS.map(([code, s0, lat], i) => {
@@ -420,16 +442,19 @@ function lightning(t) {
 }
 
 // ---------------------------------------------------------------- 3D scene direction
+// portrait: keep the landscape shot's vertical coverage (+15%) as the horizontal coverage
+const pfov = fov => PORTRAIT ? 2 * Math.atan(Math.tan(fov * 1.15 * Math.PI / 360) / camera.aspect) * 180 / Math.PI : fov;
 function cam(p, l, fov, shake = 0, t = 0) {
   camera.position.set(...p);
   camera.position.x += shake * (Math.sin(t * 1.7) * .6 + Math.sin(t * 4.3) * .25);
   camera.position.y += shake * (Math.sin(t * 2.3 + 1) * .5 + Math.sin(t * 5.1) * .2);
-  camera.up.set(0, 1, 0); camera.lookAt(...l); camera.fov = fov; camera.updateProjectionMatrix();
+  camera.up.set(0, 1, 0); camera.lookAt(...l); camera.fov = pfov(fov); camera.updateProjectionMatrix();
 }
 const STATE = { scrim: 0 };
 function setFog(color, dens) { scene.fog.color.set(color); scene.fog.density = dens; scene.background.set(color); }
 
 function direct(t) {
+  if (PORTRAIT) camera.setViewOffset(W, H, 0, -300, W, H);
   world.visible = false; ground.visible = false; trackG.visible = true; carsG.visible = false; pu.visible = false; flagG.visible = false;
   grid.visible = false; rline.visible = false; spray.visible = false; rim.intensity = 0;
   ALL.forEach(c => c.obj.visible = false);
@@ -438,7 +463,7 @@ function direct(t) {
   hemi.intensity = 1.0 + lt * 2.5; sun.intensity = 1.0 + lt * 2;
   hemi.color.set(0x9fb3c8); sun.color.set(0xc8d6ff);
   let rainI = 0, rainBox = 60, rainLen = 1.3;
-  const cx = 0, cz = -.1 * scale;
+  const cx = BB.cx, cz = BB.cz;
 
   if (t < 12) { // ---- aerial / map
     world.visible = true; ground.visible = true; grid.visible = true; rline.visible = true;
@@ -448,21 +473,21 @@ function direct(t) {
     rlineMat.opacity = t < 9.4 ? 1 : 1 - seg(t, 9.4, 11.4) * .9;
     grid.material.opacity = .5 * (1 - seg(t, 9.6, 11.5));
     if (t < 6) {
-      const k = eio(seg(t, 0, 6)), a = .35 + k * .8, r = lerp(2100, 1150, k), h = lerp(1650, 520, k);
-      cam([cx + Math.sin(a) * r, h, cz + Math.cos(a) * r], [cx + lerp(-.2 * scale, -.5 * scale, k), 0, cz + lerp(.05 * scale, .15 * scale, k)], 40);
+      const k = eio(seg(t, 0, 6)), a = .35 + k * .8, pz = PORTRAIT ? 1.45 : 1, r = lerp(2100, 1150, k) * pz, h = lerp(1650, 520, k) * pz;
+      cam([cx + Math.sin(a) * r, h, cz + Math.cos(a) * r], [cx + lerp(0, -.15 * scale, k), 0, cz + lerp(0, .1 * scale, k)], 40);
       rainI = .5; rainBox = 160; rainLen = 6;
     } else {
       const k = seg(t, 6, 9.6), d = eio(seg(t, 9.6, 12));
       // top-down map drifting, then a fluid dive towards the main straight
-      const mcx = -.21 * scale - 1150 + k * 80, mcz = .02 * scale - 60, top = [mcx, 3900 - k * 250, mcz + 1], topL = [mcx, 0, mcz];
+      const mcx = cx - (PORTRAIT ? 0 : .38 * BB.w) + k * 40, mcz = cz + (PORTRAIT ? .12 * BB.d : 0), top = [mcx, BB.h - k * 120, mcz + 1], topL = [mcx, 0, mcz];
       const grd = frameAt(sGrid + 160).p;
       const low = [grd.x + 60, 40, grd.z + 70], lowL = [grd.x - 120, 0, grd.z];
-      if (d <= 0) { camera.up.set(0, 0, -1); camera.position.set(...top); camera.lookAt(...topL); camera.fov = 38; camera.updateProjectionMatrix(); }
+      if (d <= 0) { camera.up.set(0, 0, -1); camera.position.set(...top); camera.lookAt(...topL); camera.fov = pfov(38); camera.updateProjectionMatrix(); }
       else {
         const e = d; const p = top.map((v, i) => lerp(v, low[i], e)); p[1] = lerp(top[1], low[1], eio(e) * .5 + e * .5);
         const lk = topL.map((v, i) => lerp(v, lowL[i], e));
         camera.up.set(0, 1, 0).lerp(new V3(0, 0, -1), 1 - eoe(e * 1.3)).normalize();
-        camera.position.set(...p); camera.lookAt(...lk); camera.fov = lerp(38, 46, e); camera.updateProjectionMatrix();
+        camera.position.set(...p); camera.lookAt(...lk); camera.fov = pfov(lerp(38, 46, e)); camera.updateProjectionMatrix();
         setFog(new THREE.Color(0x0a0e16).lerp(new THREE.Color(0x1b2331), e), lerp(.00008, .006, eie(e)));
       }
       rainI = lerp(.35, 1, seg(t, 9, 11.5)); rainBox = lerp(220, 70, d); rainLen = lerp(8, 1.6, d);
@@ -507,6 +532,7 @@ function direct(t) {
       cam([Math.sin(a) * lerp(2.6, 4.2, k), lerp(.6, 1.9, k), Math.cos(a) * lerp(2.6, 4.2, k)], [0, 0, -.1], 36, .01, t);
     }
   } else if (t < 45) { // ---- red flag
+    if (PORTRAIT) camera.setViewOffset(W, H, -230, -150, W, H); // landscape framing leaves the flag left of centre
     flagG.visible = true; setFog(0x0b0607, .03); scene.environment = ENV;
     hemi.intensity = .35 + lt * 2; hemi.color.set(0xb0a0a8); sun.intensity = .7 + lt * 1.5; sun.position.set(-4, 10, 8);
     rim.intensity = 1.6; rim.color.set(0xffb0a0); rim.position.set(-3, 8, 6); rim.target.position.set(1.5, 4, 0);
@@ -530,11 +556,19 @@ function direct(t) {
 
 // ---------------------------------------------------------------- 2D overlay: kinetic type & morphing shapes
 const out = document.getElementById('out'), ctx = out.getContext('2d');
+out.width = W; out.height = H;
 let T = 0;
+let NOTXT = PORTRAIT; // portrait: landscape-positioned type is off unless a block re-enables it under a transform
+function portraitBlock(s, x0, y0, x1, y1, fn) { // draw landscape-coord block (x0,y0) at portrait (x1,y1), scale s
+  if (!PORTRAIT) return fn();
+  ctx.save(); ctx.setTransform(s, 0, 0, s, x1 - x0 * s, y1 - y0 * s); NOTXT = false;
+  try { fn(); } finally { NOTXT = true; ctx.restore(); }
+}
 const RED = '#ff1e2d', CYAN = '#3fd6ff', AMBER = '#ffb020', WHITE = '#f4f6fa', DIM = 'rgba(220,230,245,.6)';
 const F = (s, w = 900, fam = 'Inter Display') => `${w} ${s}px "${fam}"`;
 
 function rise(s, x, y, o) {
+  if (NOTXT) return 0;
   const size = o.size ?? 80, a = o.a, b = o.b ?? 1e9, stg = o.stagger ?? .022, d = o.dur ?? .65, track = o.track ?? 0;
   ctx.save(); ctx.font = F(size, o.weight ?? 900, o.fam); ctx.textBaseline = 'alphabetic';
   const chars = [...s], cw = chars.map(c => ctx.measureText(c).width + track * size), tot = cw.reduce((p, c) => p + c, 0) - track * size;
@@ -550,6 +584,7 @@ function rise(s, x, y, o) {
   ctx.restore(); return tot;
 }
 function slam(s, x, y, o) {
+  if (NOTXT) return 0;
   const size = o.size ?? 200, a = o.a, b = o.b ?? 1e9, p = clamp((T - a) / (o.dur ?? .5)), e = eoe(p), q = eio(clamp((T - b) / .35));
   if (p <= 0 || q >= 1) return;
   ctx.save(); ctx.font = F(size, o.weight ?? 900, o.fam); ctx.textAlign = o.align ?? 'center'; ctx.textBaseline = 'middle';
@@ -564,6 +599,7 @@ function slam(s, x, y, o) {
   ctx.restore();
 }
 function typeOn(s, x, y, o) {
+  if (NOTXT) return 0;
   const a = o.a, b = o.b ?? 1e9, d = o.dur ?? s.length * .028;
   const n = Math.floor(s.length * clamp((T - a) / d)); const q = clamp((T - b) / .25);
   if (T < a || q >= 1) return;
@@ -573,6 +609,7 @@ function typeOn(s, x, y, o) {
   ctx.fillText(str, x, y); ctx.restore();
 }
 function fadeTxt(s, x, y, o) {
+  if (NOTXT) return 0;
   const a = o.a, b = o.b ?? 1e9, p = eoe(clamp((T - a) / .6)), q = clamp((T - b) / .3);
   if (p <= 0 || q >= 1) return;
   ctx.save(); ctx.font = F(o.size ?? 30, o.weight ?? 500, o.fam ?? 'Inter'); ctx.letterSpacing = `${(o.track ?? 0) * (o.size ?? 30)}px`;
@@ -580,10 +617,12 @@ function fadeTxt(s, x, y, o) {
   ctx.fillText(s, x + (1 - p) * (o.dx ?? 0), y + (1 - p) * (o.dy ?? 14)); ctx.restore();
 }
 function rule(x, y, w, a, b = 1e9, col = RED, h = 3) {
+  if (NOTXT) return 0;
   const p = eoe(clamp((T - a) / .7)), q = eie(clamp((T - b) / .4)); if (p <= 0 || q >= 1) return;
   ctx.fillStyle = col; ctx.fillRect(x + w * q, y, w * (p - q), h);
 }
 function counter(v0, v1, x, y, a, d, o) {
+  if (NOTXT) return 0;
   const k = eio(clamp((T - a) / d)), v = lerp(v0, v1, k);
   ctx.save(); ctx.font = F(o.size ?? 60, o.weight ?? 800, o.fam); ctx.fillStyle = o.color ?? WHITE; ctx.textAlign = o.align ?? 'left';
   ctx.globalAlpha = o.alpha ?? 1; ctx.fillText((o.fmt ?? (n => n.toFixed(0)))(v), x, y); ctx.restore();
@@ -624,16 +663,19 @@ function drawPoly(pts, cx, cy, sx, sy, o) {
 }
 function proj(v) { const p = v.clone().project(camera); return { x: (p.x + 1) / 2 * W, y: (1 - p.y) / 2 * H, ok: p.z < 1 }; }
 function tag(v, label, sub, a, b, col = WHITE, dx = 70, dy = -90) {
+  if (HUD) return;
   const p = proj(v); if (!p.ok) return; const k = eoe(clamp((T - a) / .5)), q = clamp((T - b) / .3); if (k <= 0 || q >= 1) return;
   ctx.save(); ctx.globalAlpha = k * (1 - q); ctx.strokeStyle = col; ctx.lineWidth = 2;
   const ex = p.x + dx * k, ey = p.y + dy * k;
   ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, 6.283); ctx.fillStyle = col; ctx.fill();
   ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(ex, ey); ctx.lineTo(ex + Math.sign(dx || 1) * 26, ey); ctx.stroke();
-  ctx.font = F(30, 800); ctx.textAlign = dx < 0 ? 'right' : 'left'; ctx.fillText(label, ex + Math.sign(dx || 1) * 34, ey + 10);
-  if (sub) { ctx.font = F(16, 600, 'Inter'); ctx.letterSpacing = '2px'; ctx.globalAlpha *= .75; ctx.fillText(sub, ex + Math.sign(dx || 1) * 34, ey + 34); }
+  const ts = PORTRAIT ? 1.35 : 1;
+  ctx.font = F(30 * ts, 800); ctx.textAlign = dx < 0 ? 'right' : 'left'; ctx.fillText(label, ex + Math.sign(dx || 1) * 34, ey + 10 * ts);
+  if (sub) { ctx.font = F(16 * ts, 600, 'Inter'); ctx.letterSpacing = '2px'; ctx.globalAlpha *= .75; ctx.fillText(sub, ex + Math.sign(dx || 1) * 34, ey + 34); }
   ctx.restore();
 }
 function panel(x, y, w, h, a, b, col = 'rgba(8,12,20,.62)') {
+  if (NOTXT) return 0;
   const k = eoe(clamp((T - a) / .5)), q = clamp((T - b) / .3); if (k <= 0 || q >= 1) return 0;
   ctx.save(); ctx.globalAlpha = (1 - q); ctx.fillStyle = col; ctx.fillRect(x, y, w * k, h);
   ctx.fillStyle = CYAN; ctx.fillRect(x, y, 3, h * k); ctx.restore(); return k * (1 - q);
@@ -666,8 +708,16 @@ const CHAPTERS = [[0, '01', 'THE RACE'], [6, '02', 'NEW VENUE'], [12, '03', 'FOR
 
 function overlay(t) {
   const bar_h = 62 * eoe(seg(t, 0, 1.2));
-  ctx.drawImage(vig, 0, 0);
-  if (t >= 20 && t < 36.2) { const g = ctx.createLinearGradient(0, 0, 1000, 0); g.addColorStop(0, 'rgba(3,5,10,.82)'); g.addColorStop(.6, 'rgba(3,5,10,.45)'); g.addColorStop(1, 'rgba(3,5,10,0)'); ctx.save(); ctx.globalAlpha = eoe(seg(t, 20, 20.6)) * (1 - seg(t, 35.9, 36.2)); ctx.fillStyle = g; ctx.fillRect(0, 0, 1000, H); ctx.restore(); }
+  if (!HUD) ctx.drawImage(vig, 0, 0);
+  if (PORTRAIT && t >= 20 && t < 36.2) { const g = ctx.createLinearGradient(0, 0, 0, 1000); g.addColorStop(0, 'rgba(3,5,10,.85)'); g.addColorStop(.7, 'rgba(3,5,10,.5)'); g.addColorStop(1, 'rgba(3,5,10,0)'); ctx.save(); ctx.globalAlpha = eoe(seg(t, 20, 20.6)) * (1 - seg(t, 35.9, 36.2)); ctx.fillStyle = g; ctx.fillRect(0, 0, W, 1000); ctx.restore(); }
+  if (!PORTRAIT && t >= 20 && t < 36.2) { const g = ctx.createLinearGradient(0, 0, 1000, 0); g.addColorStop(0, 'rgba(3,5,10,.82)'); g.addColorStop(.6, 'rgba(3,5,10,.45)'); g.addColorStop(1, 'rgba(3,5,10,0)'); ctx.save(); ctx.globalAlpha = eoe(seg(t, 20, 20.6)) * (1 - seg(t, 35.9, 36.2)); ctx.fillStyle = g; ctx.fillRect(0, 0, 1000, H); ctx.restore(); }
+  // ---------------- portrait map labels (real corners + where we stood)
+  if (PORTRAIT && t < 9.4) {
+    const end = t < 6 ? 5.9 : 9.3, a0 = t < 6 ? 2.2 : 6.4;
+    tag(frameAt(sT1).p, 'T1', null, a0, end, WHITE, -90, -80);
+    tag(frameAt(sT15).p, 'T15', 'HAIRPIN', a0 + .2, end, WHITE, -80, 70);
+    tag(STAND_POS, 'WE WERE HERE', 'MAIN GRANDSTAND', a0 + .5, end, AMBER, t < 6 ? -100 : 90, -130);
+  }
   // ---------------- scene 1: title
   if (t < 6.2) {
     typeOn('04 OCT 2026  ·  SEPANG INTERNATIONAL CIRCUIT  ·  5.543 KM', 140, 360, { a: .5, b: 5.6, size: 20, color: CYAN });
@@ -681,7 +731,7 @@ function overlay(t) {
   if (t >= 6 && t < 12.2) {
     const k = eio(seg(t, 6.8, 8.6)), app = eoe(seg(t, 6, 6.8)), out = eie(seg(t, 9.2, 9.8));
     const cx = 470, cy = 560, R = 250 * app * (1 - out * .4);
-    if (out < 1) {
+    if (!PORTRAIT && out < 1) {
       ctx.save(); ctx.globalAlpha = 1 - out;
       const A = k < .5 ? 'circle' : 'island', B = k < .5 ? 'island' : 'track', kk = k < .5 ? k * 2 : (k - .5) * 2;
       const sh = morphPts(A, B, eio(kk), A + B);
@@ -711,7 +761,8 @@ function overlay(t) {
     tag(h.p.clone().add(new V3(0, 1.3, 0)), 'HAM', 'P2', 15.1, 17.25, WHITE, -vl * 130, -120);
     rise('FRONT ROW', 1180, 230, { a: 15.8, b: 17.2, size: 64, weight: 300, color: DIM, align: 'left' });
     rise('LOSES DRIVE', 1180, 310, { a: 16.0, b: 17.25, size: 84, color: RED });
-    // telemetry
+    // telemetry (portrait: scaled up across the top of frame)
+    portraitBlock(1.45, 110, 640, 76, 250, () => {
     const pk = panel(110, 640, 640, 330, 17.35, 19.9);
     if (pk > 0) {
       ctx.save(); ctx.globalAlpha = pk;
@@ -733,6 +784,7 @@ function overlay(t) {
       ctx.fillStyle = WHITE; ctx.fillText(`${Math.round(formation[0].speed(T) * 3.6)}`, 720, 954);
       ctx.restore();
     }
+    });
     rise('FOOT DOWN.', 1180, 700, { a: 17.6, b: 19.75, size: 92 });
     rise('NOTHING.', 1180, 810, { a: 18.15, b: 19.8, size: 92, color: RED, glow: 'rgba(255,30,45,.5)' });
     fadeTxt('Several cars lost drive on the formation laps', 1186, 870, { a: 18.5, b: 19.8, size: 26, color: DIM });
@@ -747,8 +799,9 @@ function overlay(t) {
     tag(puLabels.MGUH, 'MGU-H', T > 22.6 ? 'REMOVED FOR 2026' : 'TURBO GENERATOR', 21.6, 23.9, AMBER, 90, -110);
     tag(puLabels.TURBO, 'TURBO', null, 24.4, 27.85, AMBER, -90, -60);
     tag(puLabels.MGUK, 'MGU-K', null, 28.4, 35.8, T > 33 ? RED : CYAN, 90, -60);
-    // step text
+    // step text (portrait: the whole column moves to the top of frame)
     const tx = 120;
+    portraitBlock(1.12, 120, 200, 70, 215, () => {
     typeOn('TECH FILE  ·  2026 HYBRID POWER UNIT', tx + 4, 210, { a: L1, b: E1, size: 18, color: CYAN });
     rise('NO MGU-H', tx, 320, { a: L1 + .2, b: E1, size: 110 });
     fadeTxt('The 2026 rules removed the motor that', tx + 4, 380, { a: L1 + .8, b: E1, size: 28, color: DIM });
@@ -761,7 +814,7 @@ function overlay(t) {
     fadeTxt('Formation-lap speed → little exhaust energy', tx + 4, 455, { a: L2 + .9, b: E2, size: 27, color: DIM });
     fadeTxt('→ turbo spools down → engine torque falls', tx + 4, 492, { a: L2 + 1.3, b: E2, size: 27, color: DIM });
     fadeTxt('→ torque demand handed to the battery', tx + 4, 529, { a: L2 + 1.9, b: E2, size: 27, color: CYAN });
-    if (T > L2 && T < E2 + .3) {
+    if (!PORTRAIT && T > L2 && T < E2 + .3) {
       const al = eoe(seg(T, L2 + .4, L2 + 1)) * (1 - seg(T, E2, E2 + .3));
       gauge(1560, 330, 120, st.turbo(T) * .92, AMBER, 'TURBO SPEED', `${Math.round(st.turbo(T) * 100)}%`, al);
       bar(1440, 560, 360, 14, st.ice(T), AMBER, 'ENGINE TORQUE', `${Math.round(st.ice(T) * 100)}%`, al);
@@ -810,6 +863,7 @@ function overlay(t) {
       }
       ctx.restore();
     }
+    });
   }
   // ---------------- scene 5: root cause
   if (t >= 36 && t < 41.2) {
@@ -866,13 +920,14 @@ function overlay(t) {
 
   // ---------------- chrome: chapter tag, flashes, grade
   const ci = CHAPTERS.filter(c => t >= c[0]).length - 1, ch = CHAPTERS[ci], ck = eoe(seg(t, ch[0] + .15, ch[0] + .7));
-  if (t < 49.4) {
+  if (!PORTRAIT && t < 49.4) {
     ctx.save(); ctx.font = F(15, 800, 'Inter'); ctx.letterSpacing = '4px'; ctx.textAlign = 'right'; ctx.globalAlpha = ck * .9;
     ctx.fillStyle = RED; ctx.fillText(ch[1], W - 120 - ctx.measureText(ch[2]).width - 18, 112); ctx.fillStyle = WHITE; ctx.fillText(ch[2], W - 120, 112);
     ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(W - 420, 124, 300, 1); ctx.fillStyle = RED; ctx.fillRect(W - 420, 124, 300 * ((ci + 1) / 7) * ck, 2);
     ctx.textAlign = 'left'; ctx.fillStyle = DIM; ctx.globalAlpha = .8 * eoe(seg(t, .3, 1)); ctx.fillText('SEPANG  ·  RED FLAG FILE', 120, 112);
     ctx.restore();
   }
+  if (HUD) return;
   // light leak flash on cuts
   for (const c of CUTS) { const d = t - c; if (d > -.04 && d < .35) { ctx.save(); ctx.globalAlpha = .55 * Math.exp(-Math.max(0, d) * 12); ctx.fillStyle = c === 41 ? '#ff2030' : '#dfeaff'; ctx.fillRect(0, 0, W, H); ctx.restore(); } }
   const lt = lightning(t); if (lt > 0) { ctx.save(); ctx.globalAlpha = Math.min(.35, lt * .22); ctx.fillStyle = '#e8f0ff'; ctx.fillRect(0, 0, W, H); ctx.restore(); }
@@ -880,7 +935,7 @@ function overlay(t) {
   ctx.save(); ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = .12; const gp = grains[Math.floor(t * 30) % 4];
   const r = rng(Math.floor(t * 30)); ctx.translate(-r() * 256, -r() * 256); ctx.fillStyle = gp; ctx.fillRect(0, 0, W + 256, H + 256); ctx.restore();
   // letterbox
-  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, bar_h); ctx.fillRect(0, H - bar_h, W, bar_h);
+  if (!PORTRAIT) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, bar_h); ctx.fillRect(0, H - bar_h, W, bar_h); }
   // fade in/out
   const fade = Math.max(1 - seg(t, 0, .5), seg(t, 49.35, 50));
   if (fade > 0) { ctx.fillStyle = `rgba(0,0,0,${fade})`; ctx.fillRect(0, 0, W, H); }
@@ -889,8 +944,8 @@ function overlay(t) {
 // ---------------------------------------------------------------- frame entry
 window.frame = async (t, q = .92) => {
   T = t; direct(t);
-  composer.render();
-  ctx.clearRect(0, 0, W, H); ctx.drawImage(glc, 0, 0);
+  if (HUD) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); }
+  else { composer.render(); ctx.clearRect(0, 0, W, H); ctx.drawImage(glc, 0, 0); }
   overlay(t);
   return out.toDataURL('image/jpeg', q);
 };

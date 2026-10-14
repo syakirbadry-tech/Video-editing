@@ -1,6 +1,8 @@
 // Usage:
 //   node render.mjs stills 1.5,8,16          -> frames/still_<t>.jpg
 //   node render.mjs video <startFrame> <endFrame> <out.mp4>
+//   PORTRAIT=1 node render.mjs ...           -> 1080x1920 vertical render (main.js ?portrait)
+//   HUD=1 ...                                 -> data graphics only, on black (main.js ?hud)
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
@@ -21,10 +23,12 @@ const browser = await chromium.launch({
   executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-gpu-vsync'],
 });
-const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+const PORTRAIT = !!process.env.PORTRAIT;
+const page = await browser.newPage({ viewport: PORTRAIT ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 } });
 page.on('console', m => console.log('[page]', m.text()));
 page.on('pageerror', e => console.log('[page error]', e.message));
-await page.goto(`http://localhost:${port}/index.html`);
+const qs = [PORTRAIT && 'portrait=1', process.env.HUD && 'hud=1'].filter(Boolean).join('&');
+await page.goto(`http://localhost:${port}/index.html${qs ? '?' + qs : ''}`);
 await page.waitForFunction('window.READY === true', null, { timeout: 120000 });
 
 const grab = async t => Buffer.from((await page.evaluate(t => window.frame(t), t)).split(',')[1], 'base64');
@@ -33,7 +37,7 @@ if (mode === 'stills') {
   fs.mkdirSync(path.join(root, 'frames'), { recursive: true });
   for (const t of a.split(',').map(Number)) {
     const s = Date.now(); const buf = await grab(t);
-    fs.writeFileSync(path.join(root, 'frames', `still_${t}.jpg`), buf); console.log('still', t, Date.now() - s, 'ms');
+    fs.writeFileSync(path.join(root, 'frames', `still_${PORTRAIT ? 'p' : ''}${process.env.HUD ? 'h' : ''}${t}.jpg`), buf); console.log('still', t, Date.now() - s, 'ms');
   }
 } else {
   const f0 = +a, f1 = +b;

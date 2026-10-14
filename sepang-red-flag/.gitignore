@@ -3,3 +3,9 @@ frames/
 chunks/
 *.wav
 footage/
+sdr/
+out/
+explainer.mp4
+soundtrack.wav
+tiktok/teal_orange.cube
+tiktok/__pycache__/
