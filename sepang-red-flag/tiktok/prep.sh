@@ -3,7 +3,8 @@
 #   footage/*.MOV  -> sdr/*.mp4       iPhone HLG (and SDR) 4K portrait -> 1080x1920 30 fps SDR, Hable tone-map
 #                  -> out/aud/*.wav   live trackside audio (real F1 sound for the mix)
 #   main.js        -> chunks/p/*.mp4  portrait renders: real Sepang map, power unit, red flag, telemetry HUD
-#   IMG_5585       -> out/ham44.mp4   Hamilton #44 zoom -> engine cover -> x-ray (tiktok/hamilton_zoom.py)
+#   IMG_5585 + photos/ham44_side.jpg -> out/ham44.mp4   Hamilton #44 zoom -> photo -> engine x-ray (tiktok/hamilton_zoom.py)
+#   photos/*.jpg   your trackside stills (gitignored like footage/), used by build.py via tiktok/stills.py
 #   audio.py       -> soundtrack.wav ; teal_orange_lut.py -> tiktok/teal_orange.cube
 set -e
 mkdir -p sdr chunks/p out/aud out/h44

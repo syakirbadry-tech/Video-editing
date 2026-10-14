@@ -1,13 +1,15 @@
-"""Hamilton #44 push-in -> punch into the engine cover -> x-ray scan.
+"""Hamilton #44 push-in -> cut to the trackside photo -> punch into the engine cover -> x-ray scan.
 
-  python3 -I tiktok/hamilton_zoom.py <frames_dir> <out.mp4> [--debug dbg.jpg]
+  python3 -I tiktok/hamilton_zoom.py <frames_dir> <out.mp4> [--photo photos/ham44_side.jpg] [--debug dbg.jpg]
 
 <frames_dir> holds the 4K (2160x3840) tone-mapped 60 fps frames of IMG_5585 from 3.35 s
-(see the ffmpeg line in tiktok/prep.sh). Output: 1080x1920 30 fps, ungraded (the build grades it).
+(see tiktok/prep.sh). The photo is the side-on shot of #44 taken from the grandstand.
+Output: 1080x1920 30 fps, ungraded (the build grades it).
 
-  A  slow-mo track (each 60 fps frame becomes one 30 fps frame = 2x slow), push 1.0 -> 1.7
-  B  freeze + punch into the engine cover behind the halo, 1.7 -> 3.6, radial zoom blur
-  C  x-ray: a scan line sweeps down, turning the bodywork into a cyan edge render with a grid
+  A  slow-mo track on the video (each 60 fps frame becomes one 30 fps frame = 2x slow), push 1.0 -> 1.7
+  B  white-flash cut to the sharp photo, punch into the engine cover, radial zoom blur
+  C  x-ray: a scan line sweeps down, the bodywork becomes a cyan edge render, then callouts
+     mark where the power-unit parts sit (illustrative positions) with the MGU-K highlighted
 """
 import glob
 import subprocess
@@ -17,7 +19,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 OW, OH, FPS = 1080, 1920, 30
-A_N, B_N, C_N = 40, 16, 30
+A_N, B_N, C_N = 36, 14, 36
 FONT = '/usr/share/fonts/opentype/inter/InterDisplay-Black.otf'
 FONT_S = '/usr/share/fonts/opentype/inter/InterDisplay-SemiBold.otf'
 
@@ -53,6 +55,21 @@ def crop(img, cx, cy, z):
     W, H = img.size; w, h = W / z, H / z
     cx = min(max(cx, w / 2), W - w / 2); cy = min(max(cy, h / 2), H - h / 2)
     return img.transform((OW, OH), Image.EXTENT, (cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2), Image.BICUBIC)
+
+
+def crop916(img, cx, cy, z):
+    """9:16 window from a photo of any aspect (z = 1 is full height), centred on (cx, cy), clamped"""
+    W, H = img.size; h = H / z; w = h * OW / OH
+    cx = min(max(cx, w / 2), W - w / 2); cy = min(max(cy, h / 2), H - h / 2)
+    return img.transform((OW, OH), Image.EXTENT, (cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2), Image.BICUBIC), (cx - w / 2, cy - h / 2, w, h)
+
+
+# where the power-unit parts sit under #44's bodywork in photos/ham44_side.jpg (illustrative)
+# (name, sub, photo xy, colour, label anchor in the 1080x1920 frame)
+PU_SPOTS = [('V6 ICE', 'COMBUSTION ENGINE', (745, 1310), (240, 240, 245), (430, 640)),
+            ('TURBO', None, (885, 1335), (255, 176, 32), (730, 800)),
+            ('BATTERY', 'ENERGY STORE', (565, 1415), (64, 214, 255), (60, 1470)),
+            ('MGU-K', 'ELECTRIC MOTOR', (655, 1380), (64, 214, 255), (60, 860))]
 
 
 def zoom_blur(img, amount, n=6):
@@ -95,6 +112,7 @@ def label(draw, x, y, k, lines):
 def main():
     src, out = sys.argv[1], sys.argv[2]
     dbg = sys.argv[sys.argv.index('--debug') + 1] if '--debug' in sys.argv else None
+    photo_path = sys.argv[sys.argv.index('--photo') + 1] if '--photo' in sys.argv else 'photos/ham44_side.jpg'
     files = sorted(glob.glob(f'{src}/f*.jpg'))[:A_N]
     imgs = [Image.open(f).convert('RGB') for f in files]
     raw = [track(im) for im in imgs]
@@ -125,32 +143,52 @@ def main():
 
     # A: slow-mo push-in on the car
     for i, im in enumerate(imgs):
-        k = ease_io(i / (A_N - 1)); cx, cy, L = tr[i]
+        k = ease_io(i / (A_N - 1)); cx, cy, L = tr[i]  # noqa: E741
         z = 1 + .7 * k
         fr = crop(im, cx, cy - 120 * (1 - k), z)
         put(overlay_label(fr, min(1, (i - 6) / 10) if i < A_N - 4 else (A_N - 1 - i) / 3))
-    # B: freeze + punch into the engine cover (just behind the halo, above the sidepod)
-    cx, cy, L = tr[-1]; ex, ey = cx + .33 * L, cy - .03 * L
-    still = imgs[-1]
+    # B: white-flash cut to the sharp photo, punch into the engine cover
+    photo = Image.open(photo_path).convert('RGB')
+    px0, py0, ex, ey = 700, 1350, 760, 1300
+    ZB, ZC = 2.2, 2.35
     for j in range(B_N):
-        k = ease_in((j + 1) / B_N)
-        z = 1.7 + (3.6 - 1.7) * k
-        px, py = cx + (ex - cx) * ease_io((j + 1) / B_N), cy + (ey - cy) * ease_io((j + 1) / B_N)
-        put(zoom_blur(crop(still, px, py, z), .22 * np.sin(np.pi * min(1, (j + 1) / B_N)) + .05))
-    # C: x-ray scan
+        k = ease_in((j + 1) / B_N); m = ease_io((j + 1) / B_N)
+        fr, _ = crop916(photo, px0 + (ex - px0) * m, py0 + (ey - py0) * m, 1 + (ZB - 1) * k)
+        fr = zoom_blur(fr, .2 * np.sin(np.pi * min(1, (j + 1) / B_N)) + .03)
+        if j < 3:  # flash on the cut
+            fr = Image.blend(fr, Image.new('RGB', fr.size, (235, 242, 255)), [.85, .5, .2][j])
+        put(fr)
+    # C: x-ray scan, then the power-unit callouts
+    f_sub = ImageFont.truetype(FONT_S, 26)
     for j in range(C_N):
-        k = j / (C_N - 1); z = 3.6 + .35 * k
-        fr = crop(still, ex, ey, z); xr = xray(fr)
-        line = int(ease_io(min(1, k / .7)) * (OH + 80)) - 40
+        k = j / (C_N - 1); z = ZB + (ZC - ZB) * k
+        fr, (x0, y0, w, h) = crop916(photo, ex, ey, z); xr = xray(fr)
+        line = int(ease_io(min(1, k / .45)) * (OH + 80)) - 40
         mask = Image.new('L', (OW, OH), 0); ImageDraw.Draw(mask).rectangle([0, 0, OW, max(0, line)], fill=255)
         im = Image.composite(xr, fr, mask).convert('RGBA')
         lay = Image.new('RGBA', im.size, (0, 0, 0, 0)); d = ImageDraw.Draw(lay)
         if 0 <= line < OH:
-            for w, a in ((24, 40), (8, 120), (3, 255)):
-                d.rectangle([0, line - w // 2, OW, line + w // 2], fill=(80, 230, 255, a))
+            for wd, a in ((24, 40), (8, 120), (3, 255)):
+                d.rectangle([0, line - wd // 2, OW, line + wd // 2], fill=(80, 230, 255, a))
         txt_a = int(255 * min(1, j / 6))
         d.text((70, 240), 'SCANNING POWER UNIT', font=font_hud, fill=(80, 230, 255, txt_a))
-        d.text((70, 280), f'{min(100, int(k / .7 * 100))}%', font=ImageFont.truetype(FONT, 72), fill=(255, 255, 255, txt_a))
+        d.text((70, 280), f'{min(100, int(k / .45 * 100))}%', font=ImageFont.truetype(FONT, 72), fill=(255, 255, 255, txt_a))
+        for n, (name, sub, (sx, sy), col, (lx, ly)) in enumerate(PU_SPOTS):
+            ka = (j - 15 - n * 4) / 4  # callouts pop in one after another once the scan has passed
+            if ka <= 0:
+                continue
+            ka = min(1, ka); a = int(255 * ka)
+            x, y = (sx - x0) / w * OW, (sy - y0) / h * OH
+            hero = name == 'MGU-K'
+            r = (18 if hero else 10) * (1 + (.3 * np.sin(j * .9) if hero else 0))
+            d.ellipse([x - r, y - r, x + r, y + r], outline=col + (a,), width=5 if hero else 4)
+            d.ellipse([x - 5, y - 5, x + 5, y + 5], fill=col + (a,))
+            fl = ImageFont.truetype(FONT, 64 if hero else 46)
+            ty = ly + (fl.size + 6 if ly < y else -14)  # leader line meets the side of the label nearest the spot
+            d.line([(x, y), (lx + 20, ty)], fill=col + (a,), width=3)
+            d.text((lx, ly), name, font=fl, fill=col + (a,), stroke_width=3, stroke_fill=(0, 10, 20, a))
+            if sub:
+                d.text((lx + 2, ly + fl.size + 4), sub, font=f_sub, fill=(235, 240, 245, a), stroke_width=2, stroke_fill=(0, 10, 20, a))
         put(Image.alpha_composite(im, lay))
     ff.stdin.close(); ff.wait()
     print('wrote', out, (A_N + B_N + C_N) / FPS, 's')

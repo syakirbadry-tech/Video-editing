@@ -23,6 +23,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 import captions as C  # noqa: E402
 import sound  # noqa: E402
+import stills  # noqa: E402
 
 OUT = os.path.join(ROOT, 'out')
 SEG, CAP = os.path.join(OUT, 'seg'), os.path.join(OUT, 'cap')
@@ -48,8 +49,13 @@ CAPS = {
 }
 # team tags: names in team colours (no logos)
 LABELS = {
-    'merc':  ('MERCEDES', 'MERCEDES-AMG PETRONAS', (0, 210, 190)),
-    'ham44': ('#44 HAMILTON', 'SCUDERIA FERRARI', (220, 0, 24)),
+    'merc':    ('MERCEDES', 'MERCEDES-AMG PETRONAS', (0, 210, 190)),
+    'ham44':   ('#44 HAMILTON', 'SCUDERIA FERRARI', (220, 0, 24)),
+    'ant12':   ('#12 ANTONELLI', 'MERCEDES-AMG PETRONAS', (0, 210, 190)),
+    'lec16':   ('#16 LECLERC', 'SCUDERIA FERRARI', (220, 0, 24)),
+    'rb6':     ('RED BULL #6', 'ORACLE RED BULL RACING', (40, 80, 255)),
+    'sc':      ('SAFETY CAR', 'FIA · MERCEDES-AMG', (255, 196, 0)),
+    'medical': ('MEDICAL CAR', 'FIA · MERCEDES-AMG', (255, 196, 0)),
 }
 
 
@@ -57,6 +63,7 @@ LABELS = {
 def foot(clip, src, dur, cap=None, **o): return dict(kind='foot', clip=clip, src=src, dur=dur, cap=cap, **o)
 def render(f, dur, e, cap=None, **o): return dict(kind='render', file=f, src=0, dur=dur, e=e, cap=cap, **o)  # e = explainer time of frame 0
 def clip(f, dur, cap=None, **o): return dict(kind='clip', file=f, src=0, dur=dur, cap=cap, **o)
+def photo(f, dur, kb, cap=None, **o): return dict(kind='photo', file=f, src=0, dur=dur, kb=kb, cap=cap, **o)  # kb = (z0, z1, c0, c1)
 
 
 EDL = [
@@ -65,7 +72,9 @@ EDL = [
          zoom=(1.08, .5, .45), vol=1.0,
          sfx=[('rev_whoosh', .4, .35), ('sub_drop', 1.4, .9), ('glitch', 2.6, .55), ('powerdown', 2.6, .5)]),
     render('chunks/p/map.mp4', 3.2, 6.4, 'bahrain', flash='white', music=(6.4, .8), sfx=[('hit', 0, .6)]),
-    foot('IMG_3136', 2.0, 2.4, 'monsoon', flash='white', strike=.7, music=(9.6, .5), sfx=[('thunder', .62, .9)]),
+    foot('IMG_3136', 2.0, 1.4, 'monsoon', flash='white', strike=.7, music=(9.6, .5), sfx=[('thunder', .62, .9)]),
+    photo('photos/safety_car_spray.jpg', 1.0, (1.12, 1.3, (520, 1150), (480, 1170)), 'monsoon', hold=True, label=('sc', 0, 1.0),
+          music=(11.0, .5), live=[('IMG_3136', 3.4, 0, 1.0, 1, .5)]),
     foot('IMG_3188', 0.9, 1.4, 'losedrive', zoom=(1.1, .5, .5), music=(15.4, .8)),
     foot('IMG_3137', 0.3, 2.7, 'footdown', zoom=(1.15, .45, .62), hud='chunks/p/hud.mp4', music=(16.8, .8)),
     # zoom into Hamilton's #44 -> punch to the engine cover -> x-ray (real 5585 audio, tape slow-mo)
@@ -75,10 +84,18 @@ EDL = [
     render('chunks/p/pu.mp4', 16.0, 20.0, music=(20.0, 1.0)),
     foot('IMG_3136', 8.1, 2.5, 'untested', flash='white', music=(38.5, .9)),
     render('chunks/p/flag.mp4', 3.0, 41.0, 'redflag', flash='red', music=(41.0, 1.0)),
-    foot('IMG_3186', 0.0, 2.0, 'suspended', music=(44.0, .6), vol=.6),
-    foot('IMG_5585', 2.3, 1.2, 'raceon', flash='white', label=('ham44', 0, 1.2), music=(45.0, .9), vol=.9, sfx=[('hit', 0, .8)]),
-    foot('IMG_5761', 4.6, 1.4, 'raceon', hold=True, vol=.9),
-    foot('IMG_3337', 3.0, 1.4, 'raceon', hold=True, vol=.9),
+    foot('IMG_3186', 0.0, 1.0, 'suspended', music=(44.0, .6, 1.0), vol=.6),
+    photo('photos/medical_car.jpg', 1.0, (1.2, 1.38, (520, 820), (470, 800)), 'suspended', hold=True, label=('medical', 0, 1.0),
+          live=[('IMG_3186', 1.0, 0, 1.0, 1, .6)]),
+    # "...and we went racing": team montage from the trackside photos, cut on the pulse
+    foot('IMG_5585', 2.3, 1.0, 'raceon', flash='white', label=('ham44', 0, 1.0), music=(45.0, .9, 3.0), vol=.9, sfx=[('hit', 0, .8)]),
+    photo('photos/ant12_close.jpg', .7, (1.05, 1.2, (600, 1060), (560, 1040)), 'raceon', hold=True, label=('ant12', 0, .7),
+          live=[('IMG_5761', .3, 0, .7, 1, .9)], sfx=[('whoosh', -.35, .4)]),
+    photo('photos/lec16_side.jpg', .7, (1.1, 1.25, (700, 1150), (640, 1150)), 'raceon', hold=True, label=('lec16', 0, .7),
+          live=[('IMG_5761', 2.6, 0, .7, 1, .9)], sfx=[('whoosh', -.35, .4)]),
+    photo('photos/rb6_wet.jpg', .7, (1.15, 1.3, (780, 1450), (720, 1460)), 'raceon', hold=True, label=('rb6', 0, .7),
+          live=[('IMG_3337', 2.4, 0, .7, 1, .9)], sfx=[('whoosh', -.35, .4)]),
+    foot('IMG_3337', 3.0, .9, 'raceon', hold=True, vol=.9, sfx=[('whoosh', -.35, .4)]),
     foot('IMG_5762', 0.3, 3.2, 'payoff', music=(47.8, .9, 2.2), vol=.5),  # chord rings into the outro
     foot('IMG_5766', 2.5, 2.5, 'outro', fadeout=.8, vol=.6),
 ]
@@ -145,8 +162,16 @@ def build_segment(i, s):
         else:
             v = add('-ss', str(s['src']), '-t', str(dur), '-i', os.path.join(ROOT, 'sdr', s['clip'] + '.mp4'))
             fc.append(f'[{v}:v]setpts=PTS-STARTPTS,{frame},{grade}[base0]')
-    elif s['kind'] == 'clip':
-        v = add('-i', os.path.join(ROOT, s['file']))
+    elif s['kind'] in ('clip', 'photo'):
+        f = os.path.join(ROOT, s['file'])
+        if s['kind'] == 'photo':
+            z0, z1, c0, c1 = s['kb']
+            name = os.path.splitext(os.path.basename(f))[0]
+            kb = os.path.join(OUT, f'kb_{name}_{s["dur"]}_{z0}_{z1}_{c0[0]}_{c0[1]}_{c1[0]}_{c1[1]}.mp4')
+            if not os.path.exists(kb):
+                stills.kenburns(f, kb, s['dur'], z0, z1, c0, c1)
+            f = kb
+        v = add('-i', f)
         fc.append(f'[{v}:v]setpts=PTS-STARTPTS,{grade}[base0]')
     else:  # explainer render: its own palette, light grain only
         v = add('-ss', str(s['src']), '-t', str(dur), '-i', os.path.join(ROOT, s['file']))
@@ -170,7 +195,8 @@ def build_segment(i, s):
     if s.get('label'):
         key, a, b = s['label']
         lb = add('-loop', '1', '-t', f'{dur}', '-i', png(key, 'lt'))
-        fc.append(f'[{lb}:v]format=rgba,fade=in:st={a}:d=0.2:alpha=1,fade=out:st={b - .2:.3f}:d=0.2:alpha=1[lt]')
+        fd = min(.2, (b - a) / 5)
+        fc.append(f'[{lb}:v]format=rgba,fade=in:st={a}:d={fd:.3f}:alpha=1,fade=out:st={b - fd:.3f}:d={fd:.3f}:alpha=1[lt]')
         fc.append(f"[{last}][lt]overlay='40-60*pow(max(0,1-(t-{a})/0.3),3)':1580:format=auto[l1]"); last = 'l1'
     if s.get('flash'):
         fc.append(flash_src(s['flash'], dur)); fc.append(f'[{last}][flash]overlay=0:0[f1]'); last = 'f1'
