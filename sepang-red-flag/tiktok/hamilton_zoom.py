@@ -1,6 +1,6 @@
 """Hamilton #44 push-in -> cut to the trackside photo -> punch into the engine cover -> x-ray scan.
 
-  python3 -I tiktok/hamilton_zoom.py <frames_dir> <out.mp4> [--photo photos/ham44_side.jpg] [--debug dbg.jpg]
+  python3 -I tiktok/hamilton_zoom.py <frames_dir> <out.mp4> [--photo photos/ham44_side.jpg] [--xray] [--debug dbg.jpg]
 
 <frames_dir> holds the 4K (2160x3840) tone-mapped 60 fps frames of IMG_5585 from 3.35 s
 (see tiktok/prep.sh). The photo is the side-on shot of #44 taken from the grandstand.
@@ -8,8 +8,9 @@ Output: 1080x1920 30 fps, ungraded (the build grades it).
 
   A  slow-mo track on the video (each 60 fps frame becomes one 30 fps frame = 2x slow), push 1.0 -> 1.7
   B  white-flash cut to the sharp photo, punch into the engine cover, radial zoom blur
-  C  x-ray: a scan line sweeps down, the bodywork becomes a cyan edge render, then callouts
-     mark where the power-unit parts sit (illustrative positions) with the MGU-K highlighted
+  C  (--xray only) x-ray: a scan line sweeps down, the bodywork becomes a cyan edge render, then callouts
+     mark where the power-unit parts sit (illustrative positions) with the MGU-K highlighted.
+     The edit now cuts from B straight into the photo-based power-unit graphic (tiktok/engine_mg.py).
 """
 import glob
 import subprocess
@@ -160,7 +161,7 @@ def main():
         put(fr)
     # C: x-ray scan, then the power-unit callouts
     f_sub = ImageFont.truetype(FONT_S, 26)
-    for j in range(C_N):
+    for j in range(C_N if '--xray' in sys.argv else 0):
         k = j / (C_N - 1); z = ZB + (ZC - ZB) * k
         fr, (x0, y0, w, h) = crop916(photo, ex, ey, z); xr = xray(fr)
         line = int(ease_io(min(1, k / .45)) * (OH + 80)) - 40
@@ -191,7 +192,7 @@ def main():
                 d.text((lx + 2, ly + fl.size + 4), sub, font=f_sub, fill=(235, 240, 245, a), stroke_width=2, stroke_fill=(0, 10, 20, a))
         put(Image.alpha_composite(im, lay))
     ff.stdin.close(); ff.wait()
-    print('wrote', out, (A_N + B_N + C_N) / FPS, 's')
+    print('wrote', out, (A_N + B_N + (C_N if '--xray' in sys.argv else 0)) / FPS, 's')
 
 
 if __name__ == '__main__':

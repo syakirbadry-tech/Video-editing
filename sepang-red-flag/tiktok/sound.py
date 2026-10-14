@@ -5,7 +5,7 @@ mix(events, total, out_wav, vo=None)
     {'wav': path, 'src': s, 'dur': s, 'gain': g, 'rate': r, 'fade': s, 'pan': p, 'bus': 'music'|'fx'|'live'}
         rate < 1 plays slower and lower (tape-style slow-mo)
     {'sfx': name, 'gain': g, 'pan': p, ...kwargs}   names: see SFX below
-  vo: optional voice-over wav, placed at 0; every other bus ducks ~8 dB under it.
+  vo: optional voice-over wav, placed at 0; every other bus ducks ~13 dB under it.
 """
 import wave
 
@@ -97,7 +97,7 @@ def glitch(d=.5):
         if _rng.random() < .5:
             out[seg] = np.sign(np.sin(2 * np.pi * f * t[seg])) * .5
         else:
-            out[seg] = band(noise(n / SR), 800, 8000)[:seg.stop - seg.start] * .8
+            out[seg] = band(noise((n + 2) / SR), 800, 8000)[:seg.stop - seg.start] * .8
         k += n + int(_rng.uniform(0, .02) * SR)
     return out * np.exp(-t * 1.5)
 
@@ -122,8 +122,21 @@ def beep(f=1800, d=.12):
     t = tt(d); return np.sin(2 * np.pi * f * t) * np.minimum(1, t * 400) * np.exp(-t * 18)
 
 
+def clank(d=.9):
+    """metal part separating / locking: inharmonic partials + a click"""
+    t = tt(d)
+    ring = sum(np.sin(2 * np.pi * f * t) * a * np.exp(-t * k) for f, a, k in [(523, 1, 9), (1187, .6, 12), (1931, .45, 16), (2877, .3, 22)])
+    return ring * .5 + band(noise(d), 2000, 12000) * np.exp(-t * 120) * .8
+
+
+def zap(d=.5):
+    """electric crackle for energy flowing (harvest / boost)"""
+    t = tt(d); out = band(noise(d), 2500, 11000) * (np.sin(2 * np.pi * 37 * t) > .2) * .5
+    return (out + np.sin(2 * np.pi * (400 + 1600 * t / d) * t) * .2) * np.minimum(1, t * 40) * np.minimum(1, (d - t) * 10)
+
+
 SFX = dict(whoosh=whoosh, rev_whoosh=rev_whoosh, hit=hit, sub_drop=sub_drop, riser=riser, tick=tick,
-           thunder=thunder, glitch=glitch, powerdown=powerdown, scanner=scanner, beep=beep)
+           thunder=thunder, glitch=glitch, powerdown=powerdown, scanner=scanner, beep=beep, clank=clank, zap=zap)
 
 
 # ------------------------------------------------------------------ mixer
@@ -178,8 +191,8 @@ def mix(events, total, out_wav, vo=None):
     m = bus['music'] * .9 + bus['live'] + bus['fx'] * .8
     if vo is not None:
         v = np.zeros((N, 2), np.float32); src = load(vo)[:N]; v[:len(src)] = src
-        v *= .5 / (np.abs(v).max() + 1e-9) * 1.8       # voice sits on top of the mix
-        m = m * (1 - .6 * np.clip(_env(v) / .08, 0, 1))[:, None] + v
+        v *= .5 / (np.abs(v).max() + 1e-9) * 2.2       # voice sits on top of the mix
+        m = m * (1 - .78 * np.clip(_env(v) / .06, 0, 1))[:, None] + v   # ~13 dB duck under speech
     m = m[:int(total * SR)]
     fo = int(.6 * SR); m[-fo:] *= np.linspace(1, 0, fo)[:, None]
     m = np.tanh(m / (np.abs(m).max() + 1e-9) * 1.6) * .9
