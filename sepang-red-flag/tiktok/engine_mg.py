@@ -56,7 +56,7 @@ def mixc(a, b, k): return tuple(int(a[i] + (b[i] - a[i]) * k) for i in range(3))
 
 
 # ------------------------------------------------------------------ the power unit photo, cut into parts
-S, OX, OY = 1.1, 32, 690          # img0 -> canvas
+S, OX, OY = 1.1, 32, 500          # img0 -> canvas (leaves y 1340-1480 for the subtitles)
 POLY = {  # img0 pixel polygons (hand-traced)
     'airbox': [(268, 95), (280, 70), (305, 62), (340, 68), (365, 90), (400, 92), (440, 100), (475, 125), (500, 160), (525, 200),
                (548, 240), (552, 262), (530, 285), (495, 300), (470, 320), (455, 345), (430, 345), (400, 335), (370, 310),
@@ -71,7 +71,7 @@ POLY = {  # img0 pixel polygons (hand-traced)
               (780, 640), (752, 662), (735, 650), (700, 600), (655, 555), (615, 545), (575, 530), (545, 515), (515, 490), (500, 455)],
 }
 ORDER = ['ex_l', 'airbox', 'ex_r', 'turbo']
-DELTA = {'airbox': (-40, -250), 'ex_l': (-140, 150), 'ex_r': (150, -170), 'turbo': (110, 190)}
+DELTA = {'airbox': (-40, -230), 'ex_l': (-150, 90), 'ex_r': (150, -150), 'turbo': (140, 110)}
 P_V6, P_MGUH, P_MGUK, P_TURBO = (330, 300), (585, 455), (440, 470), (640, 470)   # img0 points (illustrative for the motors)
 
 
@@ -267,12 +267,12 @@ def rgb_split(img, px):
 # ------------------------------------------------------------------ backgrounds
 def studio_bg():
     yy, xx = np.mgrid[0:OH, 0:OW].astype(np.float32)
-    r = np.sqrt(((xx - 540) / 900) ** 2 + ((yy - 1080) / 1100) ** 2)
+    r = np.sqrt(((xx - 540) / 900) ** 2 + ((yy - 900) / 1100) ** 2)
     v = np.clip(1 - r, 0, 1) ** 1.6
     out = np.stack([6 + 18 * v, 12 + 34 * v, 20 + 46 * v], -1)
     # perspective floor grid under the unit
-    floor = yy > 1500
-    gy = (yy - 1500) / 420
+    floor = yy > 1300
+    gy = (yy - 1300) / 620
     lines = (np.abs(((xx - 540) / np.maximum(gy, .02)) % 160 - 80) > 77) | (np.abs((np.sqrt(np.maximum(gy, 0)) * 9) % 1 - .5) > .46)
     out += (floor & lines)[..., None] * np.array([10, 40, 50]) * np.clip(1 - gy, 0, 1)[..., None] * .8
     noise = np.random.default_rng(3).normal(0, 2.2, (OH, OW, 1))
@@ -292,7 +292,7 @@ def turbo_scene(path):
     return im, cov
 
 
-CARD_Y, CARD_W = 650, OW
+CARD_Y, CARD_W = 540, OW
 # Garrett photo points (img1 px): turbine side under the heat blanket, compressor inlet, shaft between them
 G_TURB, G_COMP = (318, 172), (396, 256)
 G_MOTOR = (G_TURB[0] + (G_COMP[0] - G_TURB[0]) * .5, G_TURB[1] + (G_COMP[1] - G_TURB[1]) * .5)
@@ -329,7 +329,7 @@ class Film:
         if late:
             k_wet = ease_io(lin(t, 21.0, 21.6))
             for n in ('base', 'airbox', 'ex_l', 'ex_r'):
-                dim[n] = 1 - .25 * lin(t, 17.4, 18.0) - .35 * k_wet
+                dim[n] = 1 - .25 * lin(t, 17.4, 18.0) - .45 * k_wet
             dim['turbo'] = 1 - .55 * k_wet
             if t < 17.6:
                 hl, hl_k, hl_col = 'turbo', (.6 + .25 * math.sin(t * 7)) * lin(t, 15.3, 15.7) * (1 - .6 * lin(t, 16.2, 17.4)), AMBER
@@ -338,18 +338,18 @@ class Film:
         # light sweep across the unit on the reveal
         if t < 1.4:
             sweep = Image.new('L', (OW, OH), 0); sx = -400 + 1900 * ease_io(lin(t, .15, 1.25))
-            ImageDraw.Draw(sweep).polygon([(sx, 600), (sx + 140, 600), (sx - 260, 1500), (sx - 400, 1500)], fill=90)
+            ImageDraw.Draw(sweep).polygon([(sx, 420), (sx + 140, 420), (sx - 260, 1320), (sx - 400, 1320)], fill=90)
             sweep = ImageChops.multiply(sweep.filter(ImageFilter.GaussianBlur(30)), self._unit_alpha())
             cv.alpha_composite(Image.merge('RGBA', (*Image.new('RGB', (OW, OH), (220, 240, 255)).split(), sweep)))
 
         # camera
-        cz, cx, cy = 1.0, 540, 1060
+        cz, cx, cy = 1.0, 540, 900
         if t < 1.4:
             cz = 1.12 - .12 * ease_out(lin(t, 0, 1.4))
         tc = to_canvas(P_TURBO, DELTA['turbo'])
         if 4.2 <= t < 6.8:
             k = ease_io(lin(t, 4.3, 5.6)); cz = 1 + .55 * k + .25 * ease_io(lin(t, 6.2, 6.7))
-            cx, cy = 540 + (tc[0] - 540) * k, 1060 + (tc[1] - 1060) * k
+            cx, cy = 540 + (tc[0] - 540) * k, 900 + (tc[1] - 900) * k
         if t >= 15:
             cz = 1.0 + .04 * lin(t, 15.4, 31)
         frame, M = camera(cv.convert('RGB'), cx, cy, cz)
@@ -362,7 +362,7 @@ class Film:
         if t < 6.8:
             ta = 1 - lin(t, 4.1, 4.4)
             title_block(d, t, .05, [('INSIDE THE POWER UNIT', 34, AMBER, 'semi'), ('V6 TURBO', 100, WHITE, 'black'),
-                                    ('HYBRID', 100, TEAL, 'black')], t1=4.4)
+                                    ('HYBRID', 100, TEAL, 'black')], t1=1.8)
             v6 = M(to_canvas(P_V6))
             callout(d, v6, '1.6L V6', WHITE, lin(t, 1.45, 1.9) * ta, 'ENGINE', side=-1, length=60, size=54)
             ab = M(to_canvas((420, 150), (DELTA['airbox'][0] * ex['airbox'], DELTA['airbox'][1] * ex['airbox'])))
@@ -417,9 +417,9 @@ class Film:
             ga = lin(t, 15.3, 15.6) * (1 - lin(t, 17.4, 17.7))
             if ga > 0:
                 spin = getattr(self, '_ang', 0.0); self._ang = spin + (rpm / 125000) * 1.1
-                lay = glow_layer((OW, OH), lambda g: wheel(g, (180, 1600), 70, self._ang, AMBER, ga), 6); ov.alpha_composite(lay)
-                text(d, (290, 1560), f'{int(rpm):,}', 84, WHITE, 'black', ga, stroke=2)
-                text(d, (290, 1660), 'TURBO RPM', 30, AMBER, 'semi', ga)
+                lay = glow_layer((OW, OH), lambda g: wheel(g, (180, 1620), 64, self._ang, AMBER, ga), 6); ov.alpha_composite(lay)
+                text(d, (290, 1570), f'{int(rpm):,}', 80, WHITE, 'black', ga, stroke=2)
+                text(d, (290, 1665), 'TURBO RPM', 28, AMBER, 'semi', ga)
                 d.rounded_rectangle([290, 1710, 990, 1724], 7, fill=(255, 255, 255, int(40 * ga)))
                 d.rounded_rectangle([290, 1710, 290 + 700 * rpm / 125000, 1724], 7, fill=AMBER + (int(255 * ga),))
             # MGU-K takes over
@@ -450,16 +450,16 @@ class Film:
                 kw = 250 * (1 - ease_out(lin(t, 28.1, 28.45)))
             col = TEAL if t < 28.1 else RED
             ca = k_in
-            text(d, (70, 1300), f'{int(round(kw))}', 220, col, 'black', ca, stroke=3)
-            text(d, (70 + font('black', 220).getlength(f'{int(round(kw))}') + 20, 1470), 'kW', 70, col, 'semi', ca, anchor='ls')
-            text(d, (74, 1530), 'MGU-K DEPLOYMENT', 30, (220, 228, 236), 'semi', ca)
-            bx0, bx1, by = 74, 1000, 1590
+            text(d, (70, 950), f'{int(round(kw))}', 220, col, 'black', ca, stroke=3)
+            text(d, (70 + font('black', 220).getlength(f'{int(round(kw))}') + 20, 1120), 'kW', 70, col, 'semi', ca, anchor='ls')
+            text(d, (74, 1180), 'MGU-K DEPLOYMENT', 30, (220, 228, 236), 'semi', ca)
+            bx0, bx1, by = 74, 1000, 1240
             d.rounded_rectangle([bx0, by, bx1, by + 18], 9, fill=(255, 255, 255, int(40 * ca)))
             d.rounded_rectangle([bx0, by, bx0 + (bx1 - bx0) * kw / 350, by + 18], 9, fill=col + (int(255 * ca),))
             if t >= 22.2:
                 cap_x = bx0 + (bx1 - bx0) * 250 / 350; a = lin(t, 22.2, 22.5)
                 d.line([(cap_x, by - 20), (cap_x, by + 38)], fill=AMBER + (int(255 * a),), width=4)
-                text(d, (cap_x, by + 48), 'WET CAP 250 kW', 28, AMBER, 'semi', a, anchor='mt')
+                text(d, (cap_x, by + 44), 'WET CAP 250 kW', 26, AMBER, 'semi', a, anchor='mt')
         # --- energy-limit lock-out
         if 24.4 <= t:
             title_block(d, t, 24.45, [('STEP 03 · SEPANG ENERGY LIMIT', 34, AMBER, 'semi'), ('ENERGY LIMIT', 104, WHITE, 'black')])
@@ -492,7 +492,7 @@ class Film:
                         x = 1100
             if t >= 29.35:
                 k = lin(t, 29.35, 29.55); sc = 1 + .5 * (1 - ease_out(k))
-                text(d, (540, 1790), 'THROTTLE IGNORED', int(76 * sc), RED, 'black', k, anchor='mm', stroke=3)
+                text(d, (540, 1600), 'THROTTLE IGNORED', int(76 * sc), RED, 'black', k, anchor='mm', stroke=3)
 
     # ---------------- turbo photo scene (6.7 - 15.0)
     def turbo_frame(self, t):
@@ -541,10 +541,13 @@ class Film:
         callout(d, (co[0] + 10, co[1] + 60), 'COMPRESSOR', (220, 230, 240), lab_k, 'PUSHES AIR INTO THE V6', side=1, length=20, size=46, ring=10)
         # MGU-H label under the card
         mk = lin(t, 7.0, 7.3)
-        text(d, (70, CARD_Y + ch + 90), 'MGU-H', 120, mcol, 'black', mk * (1 - gone * .0), stroke=3)
-        text(d, (74, CARD_Y + ch + 230), 'ELECTRIC MOTOR ON THE TURBO SHAFT', 30, (220, 228, 236), 'semi', mk * (1 - lin(t, 11.6, 11.9)))
+        ly0 = CARD_Y + ch + 34
+        text(d, (70, ly0), 'MGU-H', 116, mcol, 'black', mk, stroke=3)
+        sa = mk * (1 - lin(t, 11.6, 11.9))
+        text(d, (505, ly0 + 32), 'ELECTRIC MOTOR', 26, (220, 228, 236), 'semi', sa)
+        text(d, (505, ly0 + 66), 'ON THE TURBO SHAFT', 26, (220, 228, 236), 'semi', sa)
         # harvest: exhaust in (orange) -> electricity out (blue) to the battery
-        bt = (860, CARD_Y + ch + 150)
+        bt = (940, CARD_Y + ch + 90)
         h_a = lin(t, 7.4, 7.7) * (1 - lin(t, 8.8, 9.1))
         b_a = lin(t, 8.9, 9.2) * (1 - lin(t, 11.6, 11.9))
         lay = Image.new('RGBA', (OW, OH), (0, 0, 0, 0)); g = ImageDraw.Draw(lay)
@@ -574,10 +577,10 @@ class Film:
                 xl = glow_layer((OW, OH), lambda g: (g.line([(mo[0] - r, mo[1] - r), (mo[0] + r, mo[1] + r)], fill=RED + (255,), width=26),
                                                      g.line([(mo[0] - r, mo[1] + r), (mo[0] + r, mo[1] - r)], fill=RED + (255,), width=26)), 12)
                 ov.alpha_composite(xl)
-                text(d, (70, CARD_Y + ch + 260), 'TURBO LAG IS BACK', 54, WHITE, 'black', lin(t, 14.05, 14.3), stroke=2)
+                text(d, (70, 1540), 'TURBO LAG IS BACK', 54, WHITE, 'black', lin(t, 14.05, 14.3), stroke=2)
             # strike through the MGU-H label
-            k = ease_out(lin(t, 13.85, 14.05)); ly = CARD_Y + ch + 90 + 72
-            d.line([(60, ly), (60 + 470 * k, ly)], fill=RED + (255,), width=12)
+            k = ease_out(lin(t, 13.85, 14.05)); ly = CARD_Y + ch + 34 + 70
+            d.line([(60, ly), (60 + 400 * k, ly)], fill=RED + (255,), width=12)
         im.alpha_composite(ov)
         out = im.convert('RGB')
         if t < 6.95:

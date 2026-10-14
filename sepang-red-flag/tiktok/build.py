@@ -4,7 +4,8 @@
   python3 tiktok/build.py 0 5                               # just re-render segments 0 and 5
   python3 tiktok/build.py --mix                             # reuse rendered segments, redo audio + mux
   VO=path/to/voiceover.wav python3 tiktok/build.py          # mix a recorded voice-over in (placed at 0)
-  (without VO, the AI stand-in lines from tiktok/voice.py in out/vo/ are placed per segment - see each 'vo' list)
+  (without VO, the AI stand-in lines from tiktok/voice.py in out/vo/ are placed per segment - see each 'vo' list -
+   and tiktok/subs3d.py lays 3D word-by-word subtitles over the edit from their word timings; SUBS=0 turns them off)
 
 Inputs (gitignored; tiktok/prep.sh makes them):
   sdr/<clip>.mp4           tone-mapped 1080x1920 30 fps footage
@@ -27,6 +28,7 @@ sys.path.insert(0, HERE)
 import captions as C  # noqa: E402
 import sound  # noqa: E402
 import stills  # noqa: E402
+import subs3d  # noqa: E402
 
 OUT = os.path.join(ROOT, 'out')
 SEG, CAP = os.path.join(OUT, 'seg'), os.path.join(OUT, 'cap')
@@ -75,16 +77,16 @@ EDL = [
          zoom=(1.08, .5, .45), vol=1.0, vo=[('hook', .15)],
          sfx=[('rev_whoosh', .4, .35), ('sub_drop', 1.4, .9), ('glitch', 2.6, .55), ('powerdown', 2.6, .5)]),
     render('chunks/p/map.mp4', 3.2, 6.4, 'bahrain', flash='white', music=(6.4, .8), sfx=[('hit', 0, .6)], vo=[('bahrain', .35)]),
-    foot('IMG_3136', 2.0, 1.4, 'monsoon', flash='white', strike=1.1, music=(9.6, .5), sfx=[('thunder', 1.12, .9)], vo=[('monsoon', .1)]),
-    photo('photos/safety_car_spray.jpg', 1.0, (1.12, 1.3, (520, 1150), (480, 1170)), 'monsoon', hold=True, label=('sc', 0, 1.0),
+    foot('IMG_3136', 2.0, 1.4, flash='white', strike=1.1, music=(9.6, .5), sfx=[('thunder', 1.12, .9)], vo=[('monsoon', .1)]),
+    photo('photos/safety_car_spray.jpg', 1.0, (1.12, 1.3, (520, 1150), (480, 1170)), hold=True, label=('sc', 0, 1.0),
           music=(11.0, .5), live=[('IMG_3136', 3.4, 0, 1.0, 1, .5)]),
-    foot('IMG_3188', 0.9, 1.4, 'losedrive', zoom=(1.1, .5, .5), music=(15.4, .8), vo=[('losedrive', .05)]),
-    foot('IMG_3137', 0.3, 2.9, 'footdown', zoom=(1.15, .45, .62), hud='chunks/p/hud.mp4', music=(16.8, .8), vo=[('footdown', 1.55)]),
+    foot('IMG_3188', 0.9, 1.4, zoom=(1.1, .5, .5), music=(15.4, .8), vo=[('losedrive', .05)]),
+    foot('IMG_3137', 0.3, 2.9, zoom=(1.15, .45, .62), hud='chunks/p/hud.mp4', music=(16.8, .8), vo=[('footdown', 1.55)]),
     # zoom into Hamilton's #44 -> punch to the engine cover (real 5585 audio, tape slow-mo)
     clip('out/ham44.mp4', 50 / 30, live=[('IMG_5585', 3.35, 0, 40 / 30, .5, 1.0)], vo=[('inside', .1)],
          sfx=[('riser', -.9, .35), ('whoosh', 1.2 - .6, .5), ('hit', 1.2, .9), ('whoosh', 1.667 - .5, .4)]),
     # the real power unit, taken apart: MGU-H -> 2026 removes it -> lazy turbo -> wet mode -> energy lock-out
-    clip('out/engine.mp4', 31.0, grade=False, score=('out/engine_score.wav', .9),
+    clip('out/engine.mp4', 31.0, grade=False, score=('out/engine_score.wav', .9), sub_y=1410,
          vo=[('unit', 1.4), ('mguh', 6.9), ('gone', 12.1), ('lazy', 15.0), ('wet', 21.2), ('lock', 24.5), ('zero', 28.1)],
          sfx=[('hit', 0, .5), ('clank', 1.75, .5), ('clank', 2.35, .4), ('clank', 2.45, .35), ('clank', 3.45, .55), ('whoosh', 4.0, .3),
               ('hit', 5.75, .9), ('sub_drop', 5.75, .6), ('whoosh', 6.15, .5), ('zap', 7.4, .3), ('zap', 9.0, .3), ('hit', 10.85, .7),
@@ -92,22 +94,22 @@ EDL = [
               ('clank', 15.0, .5), ('powerdown', 15.6, .25), ('zap', 17.6, .25), ('tick', 24.7, .15), ('tick', 25.05, .15),
               ('tick', 25.4, .15), ('tick', 25.75, .15), ('hit', 26.3, .8), ('glitch', 26.3, .35), ('sub_drop', 28.1, .9),
               ('glitch', 28.1, .55), ('powerdown', 28.1, .5), ('hit', 29.35, .7)]),
-    foot('IMG_3136', 8.1, 2.7, 'untested', flash='white', music=(38.5, .9), vo=[('untested', .15)]),
+    foot('IMG_3136', 8.1, 2.7, flash='white', music=(38.5, .9), vo=[('untested', .15)]),
     render('chunks/p/flag.mp4', 3.0, 41.0, 'redflag', flash='red', music=(41.0, 1.0), vo=[('redflag', .35)]),
-    foot('IMG_3186', 0.0, 1.0, 'suspended', music=(44.0, .6, 1.4), vol=.6, vo=[('suspended', .05)]),
-    photo('photos/medical_car.jpg', 1.4, (1.2, 1.38, (520, 820), (470, 800)), 'suspended', hold=True, label=('medical', 0, 1.4),
+    foot('IMG_3186', 0.0, 1.0, music=(44.0, .6, 1.4), vol=.6, vo=[('suspended', .05)]),
+    photo('photos/medical_car.jpg', 1.4, (1.2, 1.38, (520, 820), (470, 800)), hold=True, label=('medical', 0, 1.4),
           live=[('IMG_3186', 1.0, 0, 1.4, 1, .6)], vo=[('raceon', .6)]),
     # "...and we went racing": team montage from the trackside photos, cut on the pulse
-    foot('IMG_5585', 2.3, 1.6, 'raceon', flash='white', label=('ham44', 0, 1.6), music=(45.0, .9, 3.0), vol=.9, sfx=[('hit', 0, .8)]),
-    photo('photos/ant12_close.jpg', .7, (1.05, 1.2, (600, 1060), (560, 1040)), 'raceon', hold=True, label=('ant12', 0, .7),
+    foot('IMG_5585', 2.3, 1.6, flash='white', label=('ham44', 0, 1.6), music=(45.0, .9, 3.0), vol=.9, sfx=[('hit', 0, .8)]),
+    photo('photos/ant12_close.jpg', .7, (1.05, 1.2, (600, 1060), (560, 1040)), hold=True, label=('ant12', 0, .7),
           live=[('IMG_5761', .3, 0, .7, 1, .9)], sfx=[('whoosh', -.35, .4)]),
-    photo('photos/lec16_side.jpg', .7, (1.1, 1.25, (700, 1150), (640, 1150)), 'raceon', hold=True, label=('lec16', 0, .7),
+    photo('photos/lec16_side.jpg', .7, (1.1, 1.25, (700, 1150), (640, 1150)), hold=True, label=('lec16', 0, .7),
           live=[('IMG_5761', 2.6, 0, .7, 1, .9)], sfx=[('whoosh', -.35, .4)]),
-    photo('photos/rb6_wet.jpg', .7, (1.15, 1.3, (780, 1450), (720, 1460)), 'raceon', hold=True, label=('rb6', 0, .7),
+    photo('photos/rb6_wet.jpg', .7, (1.15, 1.3, (780, 1450), (720, 1460)), hold=True, label=('rb6', 0, .7),
           live=[('IMG_3337', 2.4, 0, .7, 1, .9)], sfx=[('whoosh', -.35, .4)]),
-    foot('IMG_3337', 3.0, .9, 'raceon', hold=True, vol=.9, sfx=[('whoosh', -.35, .4)]),
-    foot('IMG_5762', 0.3, 4.0, 'payoff', music=(47.8, .9, 2.2), vol=.5, vo=[('payoff', .15)]),  # chord rings into the outro
-    foot('IMG_5766', 2.5, 2.8, 'outro', fadeout=.8, vol=.6, vo=[('outro', .25)]),
+    foot('IMG_3337', 3.0, .9, hold=True, vol=.9, sfx=[('whoosh', -.35, .4)]),
+    foot('IMG_5762', 0.3, 4.0, music=(47.8, .9, 2.2), vol=.5, vo=[('payoff', .15)]),  # chord rings into the outro
+    foot('IMG_5766', 2.5, 2.8, fadeout=.8, vol=.6, vo=[('outro', .25)]),
 ]
 
 
@@ -289,10 +291,18 @@ def main():
         f.writelines(f"file '{p}'\n" for p in files)
     video = os.path.join(OUT, 'video.mp4')
     run(['ffmpeg', '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', lst, '-c', 'copy', video])
-    vo = os.environ.get('VO') or (ai_voice(timeline, total) if os.path.isdir(os.path.join(OUT, 'vo')) else None)
+    ai = not os.environ.get('VO') and os.path.isdir(os.path.join(OUT, 'vo'))
+    vo = os.environ.get('VO') or (ai_voice(timeline, total) if ai else None)
     mixwav = sound.mix(audio_events(timeline), total, os.path.join(OUT, 'mix.wav'), vo=vo)
+    # 3D word-by-word subtitles, timed from the AI voice's word timings (a recorded VO needs its own timings)
+    subs = []
+    if ai and os.environ.get('SUBS', '1') != '0':
+        lines = [(t0 + at, line) for t0, s in timeline for line, at in s.get('vo', [])]
+        bands = [(t0, t0 + s['dur'], s.get('sub_y', 1300)) for t0, s in timeline]
+        subs = ['-i', subs3d.render(lines, bands, total, os.path.join(OUT, 'subs.mov'))]
     final = os.path.join(OUT, 'sepang_red_flag_tiktok.mp4')
-    run(['ffmpeg', '-y', '-v', 'error', '-i', video, '-i', mixwav, '-map', '0:v', '-map', '1:a',
+    run(['ffmpeg', '-y', '-v', 'error', '-i', video, '-i', mixwav, *subs,
+         *(['-filter_complex', '[0:v][2:v]overlay=0:0:format=auto,format=yuv420p[v]', '-map', '[v]'] if subs else ['-map', '0:v']), '-map', '1:a',
          '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000', '-c:a', 'aac', '-b:a', '256k',
          # TikTok-friendly delivery: grain makes the intermediates huge, so cap the bitrate (~90 MB for 49 s)
          '-c:v', 'libx264', '-preset', 'slow', '-crf', '19', '-maxrate', '15M', '-bufsize', '30M',
