@@ -11,10 +11,12 @@ Inputs (gitignored; tiktok/prep.sh makes them):
   sdr/<clip>.mp4           tone-mapped 1080x1920 30 fps footage
   out/aud/<clip>.wav       each clip's live audio (real trackside F1 sound)
   out/ham44.mp4            Hamilton #44 zoom -> punch into the engine cover (tiktok/hamilton_zoom.py)
-  out/engine.mp4           real power unit taken apart, MGU-H, lock-out (tiktok/engine_mg.py) + out/engine_score.wav
+  out/engine.mp4           real power unit taken apart, MGU-H, lock-out (tiktok/engine_mg.py)
   out/vo/*.wav             AI voice-over lines (tiktok/voice.py)
   chunks/p/*.mp4           portrait explainer renders (real Sepang map, power unit, red flag, telemetry HUD)
-  soundtrack.wav           explainer score (audio.py), sliced in sync with the explainer shots
+
+Music is written for the edit (tiktok/music.py, rendered on every build): each segment with a 'mus' key
+starts a section of the cue on its cut.
 
 Race footage gets the teal-orange LUT; explainer renders keep their own palette so the red flag stays red.
 """
@@ -26,6 +28,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 import captions as C  # noqa: E402
+import music  # noqa: E402
 import sound  # noqa: E402
 import stills  # noqa: E402
 import subs3d  # noqa: E402
@@ -34,7 +37,6 @@ OUT = os.path.join(ROOT, 'out')
 SEG, CAP = os.path.join(OUT, 'seg'), os.path.join(OUT, 'cap')
 FPS, W, H = 30, 1080, 1920
 LUT = os.path.join(HERE, 'teal_orange.cube')
-ST = os.path.join(ROOT, 'soundtrack.wav')
 aud = lambda clip: os.path.join(OUT, 'aud', clip + '.wav')
 
 # ------------------------------------------------------------------ captions: lines, anchor
@@ -75,41 +77,41 @@ EDL = [
     # hook: Mercedes blasts past, slow-mo at the closest point, freeze + glitch on "stopped"
     foot('IMG_3134', 7.0, 3.2, 'hook', ramp=[(0, 1.4, 1), (1.4, 2.0, .5)], freeze=.6, label=('merc', .2, 1.3),
          zoom=(1.08, .5, .45), vol=1.0, vo=[('hook', .15)],
-         sfx=[('rev_whoosh', .4, .35), ('sub_drop', 1.4, .9), ('glitch', 2.6, .55), ('powerdown', 2.6, .5)]),
-    render('chunks/p/map.mp4', 3.2, 6.4, 'bahrain', flash='white', music=(6.4, .8), sfx=[('hit', 0, .6)], vo=[('bahrain', .35)]),
-    foot('IMG_3136', 2.0, 1.4, flash='white', strike=1.1, music=(9.6, .5), sfx=[('thunder', 1.12, .9)], vo=[('monsoon', .1)]),
+         sfx=[('rev_whoosh', .4, .35), ('sub_drop', 1.4, .9), ('glitch', 2.6, .55), ('powerdown', 2.6, .5)], mus='hook'),
+    render('chunks/p/map.mp4', 3.2, 6.4, 'bahrain', flash='white', sfx=[('hit', 0, .6)], vo=[('bahrain', .35)], mus='bahrain'),
+    foot('IMG_3136', 2.0, 1.4, flash='white', strike=1.1, sfx=[('thunder', 1.12, .9)], vo=[('monsoon', .1)], mus='monsoon'),
     photo('photos/safety_car_spray.jpg', 1.0, (1.12, 1.3, (520, 1150), (480, 1170)), hold=True, label=('sc', 0, 1.0),
-          music=(11.0, .5), live=[('IMG_3136', 3.4, 0, 1.0, 1, .5)]),
-    foot('IMG_3188', 0.9, 1.4, zoom=(1.1, .5, .5), music=(15.4, .8), vo=[('losedrive', .05)]),
-    foot('IMG_3137', 0.3, 2.9, zoom=(1.15, .45, .62), hud='chunks/p/hud.mp4', music=(16.8, .8), vo=[('footdown', 1.55)]),
+          live=[('IMG_3136', 3.4, 0, 1.0, 1, .5)], vo=[('losedrive', .5)]),
+    foot('IMG_3188', 0.9, 1.8, zoom=(1.1, .5, .5)),
+    foot('IMG_3137', 0.3, 2.9, zoom=(1.15, .45, .62), hud='chunks/p/hud.mp4', mus='footdown'),
     # zoom into Hamilton's #44 -> punch to the engine cover (real 5585 audio, tape slow-mo)
-    clip('out/ham44.mp4', 50 / 30, live=[('IMG_5585', 3.35, 0, 40 / 30, .5, 1.0)], vo=[('inside', .1)],
-         sfx=[('riser', -.9, .35), ('whoosh', 1.2 - .6, .5), ('hit', 1.2, .9), ('whoosh', 1.667 - .5, .4)]),
+    clip('out/ham44.mp4', 50 / 30, live=[('IMG_5585', 3.35, 0, 40 / 30, .5, 1.0)], vo=[('inside', .2)],
+         sfx=[('riser', -.9, .35), ('whoosh', 1.2 - .6, .5), ('hit', 1.2, .9), ('whoosh', 1.667 - .5, .4)], mus='ham'),
     # the real power unit, taken apart: MGU-H -> 2026 removes it -> lazy turbo -> wet mode -> energy lock-out
-    clip('out/engine.mp4', 31.0, grade=False, score=('out/engine_score.wav', .9), sub_y=1410,
-         vo=[('unit', 1.4), ('mguh', 6.9), ('gone', 12.1), ('lazy', 15.0), ('wet', 21.2), ('lock', 24.5), ('zero', 28.1)],
+    clip('out/engine.mp4', 31.0, grade=False, sub_y=1410,
+         vo=[('unit', 1.5), ('mguh', 6.8), ('gone', 12.1), ('lazy', 15.0), ('wet', 21.2), ('lock', 24.3), ('zero', 28.15)],
          sfx=[('hit', 0, .5), ('clank', 1.75, .5), ('clank', 2.35, .4), ('clank', 2.45, .35), ('clank', 3.45, .55), ('whoosh', 4.0, .3),
               ('hit', 5.75, .9), ('sub_drop', 5.75, .6), ('whoosh', 6.15, .5), ('zap', 7.4, .3), ('zap', 9.0, .3), ('hit', 10.85, .7),
               ('sub_drop', 12.0, .45), ('hit', 13.85, .8), ('glitch', 13.85, .45), ('powerdown', 13.9, .35), ('rev_whoosh', 14.0, .35),
               ('clank', 15.0, .5), ('powerdown', 15.6, .25), ('zap', 17.6, .25), ('tick', 24.7, .15), ('tick', 25.05, .15),
               ('tick', 25.4, .15), ('tick', 25.75, .15), ('hit', 26.3, .8), ('glitch', 26.3, .35), ('sub_drop', 28.1, .9),
-              ('glitch', 28.1, .55), ('powerdown', 28.1, .5), ('hit', 29.35, .7)]),
-    foot('IMG_3136', 8.1, 2.7, flash='white', music=(38.5, .9), vo=[('untested', .15)]),
-    render('chunks/p/flag.mp4', 3.0, 41.0, 'redflag', flash='red', music=(41.0, 1.0), vo=[('redflag', .35)]),
-    foot('IMG_3186', 0.0, 1.0, music=(44.0, .6, 1.4), vol=.6, vo=[('suspended', .05)]),
+              ('glitch', 28.1, .55), ('powerdown', 28.1, .5), ('hit', 29.35, .7)], mus='engine'),
+    foot('IMG_3136', 8.1, 2.7, flash='white', vo=[('untested', .05)], mus='untested'),
+    render('chunks/p/flag.mp4', 3.0, 41.0, 'redflag', flash='red', vo=[('redflag', .35)], mus='redflag'),
+    foot('IMG_3186', 0.0, 1.0, vol=.6, vo=[('suspended', .05)]),
     photo('photos/medical_car.jpg', 1.4, (1.2, 1.38, (520, 820), (470, 800)), hold=True, label=('medical', 0, 1.4),
-          live=[('IMG_3186', 1.0, 0, 1.4, 1, .6)], vo=[('raceon', .6)]),
-    # "...and we went racing": team montage from the trackside photos, cut on the pulse
-    foot('IMG_5585', 2.3, 1.6, flash='white', label=('ham44', 0, 1.6), music=(45.0, .9, 3.0), vol=.9, sfx=[('hit', 0, .8)]),
-    photo('photos/ant12_close.jpg', .7, (1.05, 1.2, (600, 1060), (560, 1040)), hold=True, label=('ant12', 0, .7),
-          live=[('IMG_5761', .3, 0, .7, 1, .9)], sfx=[('whoosh', -.35, .4)]),
-    photo('photos/lec16_side.jpg', .7, (1.1, 1.25, (700, 1150), (640, 1150)), hold=True, label=('lec16', 0, .7),
-          live=[('IMG_5761', 2.6, 0, .7, 1, .9)], sfx=[('whoosh', -.35, .4)]),
-    photo('photos/rb6_wet.jpg', .7, (1.15, 1.3, (780, 1450), (720, 1460)), hold=True, label=('rb6', 0, .7),
-          live=[('IMG_3337', 2.4, 0, .7, 1, .9)], sfx=[('whoosh', -.35, .4)]),
-    foot('IMG_3337', 3.0, .9, hold=True, vol=.9, sfx=[('whoosh', -.35, .4)]),
-    foot('IMG_5762', 0.3, 4.0, music=(47.8, .9, 2.2), vol=.5, vo=[('payoff', .15)]),  # chord rings into the outro
-    foot('IMG_5766', 2.5, 2.8, fadeout=.8, vol=.6, vo=[('outro', .25)]),
+          live=[('IMG_3186', 1.0, 0, 1.4, 1, .6)], vo=[('raceon', .6)], mus='raceon'),
+    # "...and we went racing": team montage from the trackside photos, a cut on every beat
+    foot('IMG_5585', 2.3, 2.0, flash='white', label=('ham44', 0, 2.0), vol=.9, sfx=[('hit', 0, .8)], mus='montage'),
+    photo('photos/ant12_close.jpg', .5, (1.05, 1.2, (600, 1060), (560, 1040)), hold=True, label=('ant12', 0, .5),
+          live=[('IMG_5761', .3, 0, .5, 1, .9)], sfx=[('whoosh', -.35, .4)]),
+    photo('photos/lec16_side.jpg', .5, (1.1, 1.25, (700, 1150), (640, 1150)), hold=True, label=('lec16', 0, .5),
+          live=[('IMG_5761', 2.6, 0, .5, 1, .9)], sfx=[('whoosh', -.35, .4)]),
+    photo('photos/rb6_wet.jpg', .5, (1.15, 1.3, (780, 1450), (720, 1460)), hold=True, label=('rb6', 0, .5),
+          live=[('IMG_3337', 2.4, 0, .5, 1, .9)], sfx=[('whoosh', -.35, .4)]),
+    foot('IMG_3337', 3.0, 1.0, hold=True, vol=.9, sfx=[('whoosh', -.35, .4)]),
+    foot('IMG_5762', 0.3, 4.0, vol=.5, vo=[('payoff', .15)], mus='payoff'),  # music resolves into the outro
+    foot('IMG_5766', 2.5, 2.8, fadeout=.8, vol=.6, vo=[('outro', .25)], mus='outro'),
 ]
 
 
@@ -239,11 +241,6 @@ def audio_events(timeline):
                 ev.append(dict(wav=aud(s['clip']), src=s['src'], dur=dur, at=t0, gain=vol, hp=80))
         for c, src, at, d, rate, g in s.get('live', []):
             ev.append(dict(wav=aud(c), src=src, dur=d, rate=rate, at=t0 + at, gain=g, hp=60))
-        if s.get('music'):  # (explainer time, gain[, extra tail seconds])
-            e, g, tail = (*s['music'], 0)[:3]
-            ev.append(dict(wav=ST, src=e, dur=dur + tail, at=t0, gain=g, bus='music', fade=.08))
-        if s.get('score'):  # a cue written for this segment (e.g. tiktok/engine_score.py)
-            ev.append(dict(wav=os.path.join(ROOT, s['score'][0]), src=0, dur=dur, at=t0, gain=s['score'][1], bus='music', fade=.08))
         for name, at, g in s.get('sfx', []):
             ev.append(dict(sfx=name, at=t0 + at, gain=g))
         if s.get('cap') and not s.get('hold'):
@@ -293,7 +290,11 @@ def main():
     run(['ffmpeg', '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', lst, '-c', 'copy', video])
     ai = not os.environ.get('VO') and os.path.isdir(os.path.join(OUT, 'vo'))
     vo = os.environ.get('VO') or (ai_voice(timeline, total) if ai else None)
-    mixwav = sound.mix(audio_events(timeline), total, os.path.join(OUT, 'mix.wav'), vo=vo)
+    # background music: one cue cut to the picture, each 'mus' segment starts a section (tiktok/music.py)
+    marks = {s['mus']: t0 for t0, s in timeline if s.get('mus')}
+    score = music.render(marks, total, os.path.join(OUT, 'music.wav'))
+    ev = audio_events(timeline) + [dict(wav=score, src=0, dur=total, at=0, gain=.75, bus='music', fade=.02)]
+    mixwav = sound.mix(ev, total, os.path.join(OUT, 'mix.wav'), vo=vo)
     # 3D word-by-word subtitles, timed from the AI voice's word timings (a recorded VO needs its own timings)
     subs = []
     if ai and os.environ.get('SUBS', '1') != '0':

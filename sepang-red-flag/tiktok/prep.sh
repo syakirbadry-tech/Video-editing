@@ -4,7 +4,7 @@
 #                  -> out/aud/*.wav   live trackside audio (real F1 sound for the mix)
 #   main.js        -> chunks/p/*.mp4  portrait renders: real Sepang map, power unit, red flag, telemetry HUD
 #   IMG_5585 + photos/ham44_side.jpg -> out/ham44.mp4   Hamilton #44 zoom -> photo punch into the engine cover (tiktok/hamilton_zoom.py)
-#   photos/pu/img0.jpeg (power unit) + img1.jpeg (Garrett e-turbo) -> out/engine.mp4 + out/engine_score.wav (tiktok/engine_mg.py)
+#   photos/pu/img0.jpeg (power unit) + img1.jpeg (Garrett e-turbo) -> out/engine.mp4 (tiktok/engine_mg.py)
 #   tiktok/voice.py -> out/vo/*.wav   AI stand-in voice-over (Kokoro TTS, needs KOKORO_DIR - see voice.py)
 #   photos/*.jpg   your trackside stills (gitignored like footage/), used by build.py via tiktok/stills.py
 #   audio.py       -> soundtrack.wav ; teal_orange_lut.py -> tiktok/teal_orange.cube
@@ -33,8 +33,7 @@ ffmpeg -y -v error -f concat -safe 0 -i chunks/p/pu.txt -c copy chunks/p/pu.mp4
 [ -f out/h44/f001.jpg ] || ffmpeg -y -v error -ss 3.35 -t 0.75 -i footage/IMG_5585.MOV -vf "$TM,format=yuvj444p" -q:v 2 out/h44/f%03d.jpg
 [ -f out/ham44.mp4 ] || python3 -I tiktok/hamilton_zoom.py out/h44 out/ham44.mp4
 
-# real power unit taken apart (motion graphic) + its score
+# real power unit taken apart (motion graphic)
 [ -f out/engine.mp4 ] || python3 -I tiktok/engine_mg.py out/engine.mp4
-[ -f out/engine_score.wav ] || python3 -I tiktok/engine_score.py out/engine_score.wav
 # AI voice-over lines (skip if you have your own recording: VO=... python3 tiktok/build.py)
 [ -d out/vo ] || python3 -I tiktok/voice.py

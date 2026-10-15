@@ -31,35 +31,36 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTD = os.path.join(ROOT, 'out', 'vo')
 SR_K, SR = 24000, 48000
 
-# delivery: speed, pitch (semitones), level
+# delivery: speed, pitch (semitones), level - kept close to the voice's own read: big tape shifts
+# changed the voice from line to line and made the narration sound stitched together
 EMO = {
-    'hype':     (1.16, 1.6, 1.00),
-    'excited':  (1.10, 1.0, .95),
-    'curious':  (1.04, .5, .90),
-    'tense':    (.98, -.4, .90),
-    'confused': (.94, .4, .85),
-    'sad':      (.86, -1.3, .75),
-    'warm':     (1.04, .3, .90),
+    'hype':     (1.08, .5, 1.00),
+    'excited':  (1.06, .35, .95),
+    'curious':  (1.02, .15, .90),
+    'tense':    (1.00, -.15, .90),
+    'confused': (.98, .2, .88),
+    'sad':      (.93, -.45, .80),
+    'warm':     (1.00, .1, .90),
 }
+# whole sentences, no mid-line "..." - each line reads as one continuous thought
 LINES = {  # id: (text, delivery)
-    'hook':     ('We were at *Sepang*... the day F1 cars just... *stopped.*', 'excited'),
-    'bahrain':  ('The *Bahrain* Grand Prix, moved to *Malaysia!*', 'hype'),
-    'monsoon':  ('Then... the *monsoon* hit.', 'tense'),
-    'losedrive': ('On the formation lap, cars just *lost* *drive.*', 'tense'),
-    'footdown': ('Foot down... *nothing?!*', 'confused'),
+    'hook':     ('We were at *Sepang* the day the F1 cars just *stopped!*', 'excited'),
+    'bahrain':  ('The *Bahrain* Grand Prix had moved to *Malaysia!*', 'hype'),
+    'monsoon':  ('Then the *monsoon* hit the circuit.', 'tense'),
+    'losedrive': ('On the formation lap, the cars started *losing* *drive.* Drivers floored it, and *nothing* happened!', 'tense'),
     'inside':   ("So what *happened?* Let's look inside the *power* *unit.*", 'curious'),
-    'unit':     ('A [1.6-litre|one point six litre] *V6.* A *turbo.* And hidden on the shaft... the *[MGU-H!|M G U H!]*', 'excited'),
-    'mguh':     ('It turned hot exhaust into *electricity,* and spun the turbo up *instantly.* *Zero* *lag!*', 'hype'),
-    'gone':     ("But for [2026...|twenty twenty-six...] it's *gone.*", 'sad'),
-    'lazy':     ('In the rain, the turbo goes *lazy...* so the car leans on the *[MGU-K.|M G U K.]* The electric motor.', 'tense'),
+    'unit':     ('This is a [1.6-litre|one point six litre] *V6* *turbo,* and hidden on the shaft is the *[MGU-H!|M G U H!]*', 'excited'),
+    'mguh':     ('It turned hot exhaust into *electricity* and spun the turbo up *instantly,* for *zero* *lag!*', 'hype'),
+    'gone':     ("But for [2026,|twenty twenty-six,] it's *gone* for good.", 'sad'),
+    'lazy':     ('In the rain the turbo gets *lazy,* so the car leans on the *[MGU-K,|M G U K,]* its electric motor.', 'tense'),
     'wet':      ('But *wet* *mode* caps how much power the battery can give.', 'tense'),
-    'lock':     ('Then the energy limit kicked in, and the software *locked* it *out.*', 'tense'),
-    'zero':     ('*Zero* kilowatts. Throttle... *ignored?!*', 'confused'),
-    'untested': ('A combination *nobody* had ever tested.', 'confused'),
-    'redflag':  ('*Red* *flag.*', 'sad'),
-    'suspended': ('Session... *suspended.*', 'sad'),
-    'raceon':   ('The [FIA|F I A] sent new *software* to every team... and we went *racing!*', 'hype'),
-    'payoff':   ('A software *bug* stopped F1. A software *fix* restarted it.', 'warm'),
+    'lock':     ('Then the energy limit kicked in, and the software *locked* the power *out.*', 'tense'),
+    'zero':     ('*Zero* kilowatts, so the throttle was *ignored!*', 'confused'),
+    'untested': ('It was a combination *nobody* had ever tested.', 'confused'),
+    'redflag':  ('Out came the *red* *flag.*', 'sad'),
+    'suspended': ('The session was *suspended.*', 'sad'),
+    'raceon':   ('The [FIA|F I A] sent new *software* to every team, and we went *racing* again!', 'hype'),
+    'payoff':   ('A software *bug* stopped [F1,|Formula One,] and a software *fix* restarted it.', 'warm'),
     'outro':    ('Were *you* at *Sepang?* Tell me in the comments!', 'excited'),
 }
 
@@ -153,6 +154,33 @@ def trim(x, thr=.01, pad=.06):
     return x[a:b], a
 
 
+def tighten(x, words, cap=.24, thr=.02):
+    """shorten any pause inside the line to `cap` s (TTS sentence breaks run long and sound like the
+    read stalled); word times after each cut move up with it"""
+    hop = SR // 100
+    e = np.abs(x[:len(x) // hop * hop]).reshape(-1, hop).max(1) < thr * np.abs(x).max()
+    cuts, i = [], 0
+    while i < len(e):
+        if e[i]:
+            j = i
+            while j < len(e) and e[j]:
+                j += 1
+            if i > 0 and j < len(e) and (j - i) * hop > cap * SR:
+                half = int(cap * SR / 2)
+                cuts.append((i * hop + half, j * hop - half))
+            i = j
+        else:
+            i += 1
+    for a, b in reversed(cuts):
+        x = np.concatenate([x[:a], x[b:]])
+        d = (b - a) / SR
+        for w in words:
+            for k in ('s', 'e'):
+                if w[k] >= b / SR: w[k] = round(w[k] - d, 3)
+                elif w[k] > a / SR: w[k] = round(a / SR, 3)
+    return x
+
+
 def polish(x):
     """gentle presence lift + compression, so the TTS sits forward like a close-mic read"""
     X = np.fft.rfft(x); f = np.fft.rfftfreq(len(x), 1 / SR)
@@ -177,6 +205,7 @@ def make(ids, voice):
         sec = lambda e: max(0.0, e / SR_K / p - cut / SR)       # token edge -> seconds in the final wav
         words = [dict(w=shown, s=round(sec(edges[1 + x]), 3), e=round(sec(edges[1 + y]), 3), p=punct, emph=emph)
                  for (shown, _, punct, emph), (x, y) in zip(us, spans)]
+        a = tighten(a, words)
         json.dump(dict(text=text, emo=emo, words=words), open(os.path.join(OUTD, f'{i}.json'), 'w'), indent=1)
         with wave.open(os.path.join(OUTD, f'{i}.wav'), 'wb') as w:
             w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR)

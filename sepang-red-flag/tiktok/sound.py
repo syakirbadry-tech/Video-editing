@@ -5,7 +5,7 @@ mix(events, total, out_wav, vo=None)
     {'wav': path, 'src': s, 'dur': s, 'gain': g, 'rate': r, 'fade': s, 'pan': p, 'bus': 'music'|'fx'|'live'}
         rate < 1 plays slower and lower (tape-style slow-mo)
     {'sfx': name, 'gain': g, 'pan': p, ...kwargs}   names: see SFX below
-  vo: optional voice-over wav, placed at 0; every other bus ducks ~13 dB under it.
+  vo: optional voice-over wav, placed at 0; every other bus ducks ~12 dB under it.
 """
 import wave
 
@@ -192,7 +192,7 @@ def mix(events, total, out_wav, vo=None):
     if vo is not None:
         v = np.zeros((N, 2), np.float32); src = load(vo)[:N]; v[:len(src)] = src
         v *= .5 / (np.abs(v).max() + 1e-9) * 2.2       # voice sits on top of the mix
-        m = m * (1 - .78 * np.clip(_env(v) / .06, 0, 1))[:, None] + v   # ~13 dB duck under speech
+        m = m * (1 - .75 * np.clip(_env(v, rel=.5) / .06, 0, 1))[:, None] + v   # ~12 dB duck under speech, slow release
     m = m[:int(total * SR)]
     fo = int(.6 * SR); m[-fo:] *= np.linspace(1, 0, fo)[:, None]
     m = np.tanh(m / (np.abs(m).max() + 1e-9) * 1.6) * .9
